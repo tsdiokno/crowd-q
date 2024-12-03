@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Song Queue</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    .body-container {
+      margin: 0 auto;
+      width: 780px;
+    }
+    h1 {
+      text-align: center;
+    }
+    #queue-display {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #fff;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+    }
+    .queue-item {
+      margin: 10px 0;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      display: flex;
+    }
+
+    .queue-item > * {
+      margin: 5px;
+    }
+    
+    .current-playing {
+      background-color: #e0ffe0;
+    }
+    .control-buttons {
+      margin-top: 20px;
+      text-align: center;
+      display: none; /* Initially hidden */
+    }
+    iframe {
+      margin: 20px auto;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    #video-container {
+      display: block;
+      text-align: center;
+      display: none; /* Initially hidden */
+    }
+    .password-container {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="body-container">
+  <h1>YTM4 🤘🕺🎧🎶🎹🎶</h1>
+
+  <label for="youtube-url">Paste YouTube URL:</label>
+  <input type="text" id="youtube-url" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
+  <button id="add-to-queue">Add to Queue</button>
+  <button id="refresh-button">Refresh Queue</button>
+
+  <div id="queue-display">
+    <h2>Queue</h2>
+    <div id="queue-list"></div>
+  </div>
+
+  <div id="video-container">
+    <!-- Initially, the iframe is hidden -->
+    <div id="youtube-player"></div>
+  </div>
+
+  <div class="control-buttons">
+    <button id="play-button">Play</button>
+    <button id="pause-button">Pause</button>
+    <button id="next-button">Next</button>
+  </div>
+
+  <div class="password-container">
+    <label for="password">Enter password to control playback:</label>
+    <input type="password" id="password">
+    <button id="submit-password">Submit</button>
+  </div>
+
+  <footer style="text-align: center; margin-top: 40px; font-size: 14px; color: #777;">
+    <p><strong>Made by Timothy</strong></p>
+    <p>
+      This app is similar to Spotify's Jam feature—a collaborative queue for YouTube music. It allows users to add songs to a shared queue, but playback is controlled by the host (who knows the password and has the equipment for centralized playback). 
+    </p>
+    <p>
+      Individuals can use it if they guess the password, but I'm not sure what benefit it will give them using it alone if they could just make their own playlist or manually queue their own songs in the official app. If you happen to find this app by accident and are not in the same place as the one who controls the playback, this app might be pretty useless for you. 
+    </p>
+    <p>
+      It’s a very simple alternative to Spotify’s feature, designed for situations when only YouTube is available. The queue list automatically refreshes every 30 seconds, but you can manually refresh it so you'll know what's playing or what's been added by others on-demand. Enjoy the music, and remember, it’s only fun when you’re in the same place as the host! 🎶
+    </p>
+  </footer>
+  
+</div><!--.body-container-->
+
+  <script>
+    let queue = [];
+    let player;
+    const queueDisplay = document.getElementById('queue-list');
+    const youtubeUrlInput = document.getElementById('youtube-url');
+    const addButton = document.getElementById('add-to-queue');
+    const refreshButton = document.getElementById('refresh-button');
+    const passwordInput = document.getElementById('password');
+    const submitPasswordButton = document.getElementById('submit-password');
+    const passwordContainer = document.querySelector('.password-container');
+    const controlButtons = document.querySelector('.control-buttons');
+    const videoContainer = document.querySelector('#video-container');
+    const correctPassword = "12345"; // You can change this password in the JavaScript code
+
+    // Load queue from local storage or fetch from PHP
+    function loadQueue() {
+      fetch('get_queue.php')  // Fetch the queue from the server-side PHP
+        .then(response => response.json())
+        .then(data => {
+          queue = data;
+          updateQueueDisplay();
+        });
+    }
+
+    // Save queue to server-side PHP
+    function saveQueue() {
+      fetch('save_queue.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ queue: queue })
+      });
+    }
+
+    // Helper function to extract VIDEO_ID from a YouTube URL
+    function extractVideoId(url) {
+      const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+      const match = url.match(regex);
+      return match ? match[1] : null;
+    }
+
+    // Initialize YouTube Player
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('youtube-player', {
+        height: '360',
+        width: '640',
+        events: {
+          'onStateChange': onPlayerStateChange
+        }
+      });
+    }
+
+    // Handle YouTube Player state changes
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.ENDED) {
+        nextSong();
+      }
+    }
+
+    // Add URL to queue and refresh display
+    addButton.addEventListener('click', () => {
+      const url = youtubeUrlInput.value.trim();
+      const videoId = extractVideoId(url);
+      if (videoId && !queue.includes(url)) {
+        queue.push(url);
+        saveQueue(); // Save updated queue to server
+        updateQueueDisplay();
+        youtubeUrlInput.value = ''; // Clear input after adding
+      } else {
+        alert('Invalid YouTube URL or already in queue');
+      }
+    });
+
+    // Update the queue display
+    function updateQueueDisplay() {
+      queueDisplay.innerHTML = '';
+      queue.forEach((url, index) => {
+        const videoId = extractVideoId(queue[index]);
+        const div = document.createElement('div');
+        div.classList.add('queue-item');
+        div.innerHTML = `
+          <img class="queue-item-thumbnail" src="https://img.youtube.com/vi/${videoId}/3.jpg" alt="Thumbnail">
+          <div class="queue-item-info" >Queue Position: ${index + 1} <br> URL: ${url}</div>
+        `;
+        // div.textContent = `Song ${index + 1}: ${url} - ${videoId}`;
+        if (index === 0) div.classList.add('current-playing'); // Highlight the first song
+        queueDisplay.appendChild(div);
+      });
+    }
+
+    // Play the first song in the queue
+    function playQueue() {
+      if (queue.length > 0) {
+        const videoId = extractVideoId(queue[0]); // Extract VIDEO_ID
+        if (videoId) {
+          console.log(`Now playing: https://www.youtube.com/watch?v=${videoId}`);
+          player.loadVideoById(videoId);
+        } else {
+          console.error('Invalid YouTube URL');
+        }
+      } else {
+        console.log('Queue is empty');
+      }
+    }
+
+    // Play the next song in the queue
+    function nextSong() {
+      if (queue.length > 0) {
+        queue.shift(); // Remove the first song (the one that was just played)
+        saveQueue(); // Save updated queue to server
+        updateQueueDisplay();
+        playQueue(); // Play the next song
+      } else {
+        console.log('No more songs in the queue');
+      }
+    }
+
+    // Handle password submission and controls
+    submitPasswordButton.addEventListener('click', () => {
+      const enteredPassword = passwordInput.value;
+      if (enteredPassword === correctPassword) {
+        localStorage.setItem('password', correctPassword); // Store password in localStorage
+        passwordContainer.style.display = 'none'; // Hide the password input if correct
+        controlButtons.style.display = 'block'; // Show the control buttons
+        videoContainer.style.display = 'block'; // Show the iframe
+      } else {
+        alert('Incorrect password');
+      }
+    });
+
+    // Bind play, pause, and next buttons
+    document.getElementById('play-button').addEventListener('click', playQueue);
+    document.getElementById('pause-button').addEventListener('click', () => {
+      player.pauseVideo();
+    });
+    document.getElementById('next-button').addEventListener('click', nextSong);
+
+    // Initial queue display
+    updateQueueDisplay();
+
+    // Load the YouTube Iframe API
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // Load queue from server when the page loads
+    window.onload = loadQueue;
+
+    // Reload Queue
+    refreshButton.addEventListener('click', () => {
+      loadQueue();
+    });
+    
+    setInterval(loadQueue, 30000);
+  </script>
+</body>
+</html>
