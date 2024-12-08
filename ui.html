@@ -88,34 +88,35 @@
                     <img src="" alt="" height="90" width="120" class="img-thumbnail">
                 </div>
                 <div class="info align-self-center">
-                    <p class="display-6">
+                    <p class="h3">This Is A Long Song Title</p>
+                    <p>
                         <i class="bi bi-link-45deg"></i>
                         <a href="#">link goes here</a>
-                         
                     </p>
                 </div>
             </div>`;
 
         // Function to repeat the HTML block
         function repeatHtmlBlock(containerId, html, iterations) {
-        const container = document.getElementById(containerId);
+                const container = document.getElementById(containerId);
 
-        if (!container) {
-            console.error(`Container with ID '${containerId}' not found.`);
-            return;
-        }
+                if (!container) {
+                    console.error(`Container with ID '${containerId}' not found.`);
+                    return;
+                }
 
-        let repeatedContent = '';
-        for (let i = 0; i < iterations; i++) {
-            repeatedContent += html;
-        }
+                let repeatedContent = '';
+                for (let i = 0; i < iterations; i++) {
+                    repeatedContent += html;
+                }
 
-        container.innerHTML = repeatedContent;
-        }
+                container.innerHTML = repeatedContent;
+            }
 
         // Call the function with the desired parameters
         repeatHtmlBlock('queue-container', htmlBlock, 20); // Adjust the iterations as needed
     </script>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </body>
 </html>
