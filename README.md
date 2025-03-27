@@ -1,6 +1,6 @@
 # YTM4: A YouTube Collaborative Queue  
 
-![image](https://github.com/user-attachments/assets/4c7fe8cc-bc7c-4ae1-8966-e00aabdd8ea2)
+![image](/../main/screenshot.png?raw=true "Screenshot")
 
 
 A simple, lightweight web app for creating a collaborative YouTube music queue. Inspired by Spotify's **Jam** feature, this app allows multiple users to add YouTube links to a shared queue while playback remains centralized to the host. Ideal for group listening sessions where only YouTube is available.  
