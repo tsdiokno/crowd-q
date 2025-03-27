@@ -13,6 +13,7 @@ A simple, lightweight web app for creating a collaborative YouTube music queue. 
 - **Real-Time Queue Updates**: The queue refreshes every 30 seconds automatically, or you can manually refresh it to see updates on-demand.  
 - **Password Protection**: Playback controls and are protected by a host-defined password to maintain centralized control.  
 - **Lightweight Design**: Simple UI, no unnecessary bloat.  
+- **Video Information**: Thumbnails are displayed automatically, and video titles are shown when a YouTube Data API key is configured.  
 
 ---
 
@@ -28,6 +29,7 @@ That said, if you're using this app alone or stumbled upon it accidentally, you 
 ### Prerequisites  
 - A web server with PHP support (e.g., Apache, Nginx).  
 - A browser that supports modern JavaScript.  
+- (Optional) YouTube Data API key for displaying video titles.  
 
 ### Steps  
 1. Clone this repository:  
@@ -40,7 +42,15 @@ That said, if you're using this app alone or stumbled upon it accidentally, you 
 3. Ensure the following files and folders are writable:  
    - `queue.json` (for saving the queue state).  
 
-4. Start your server and navigate to the app in your browser.  
+4. (Optional) Create a `config.json` file in the root directory with the following structure to enable video titles:  
+   ```json
+   {
+     "youtube_api_key": "YOUR_API_KEY"
+   }
+   ```  
+   Replace `YOUR_API_KEY` with your actual YouTube Data API key. You can get one from the [Google Cloud Console](https://console.cloud.google.com/). Without this, the app will still work but will only show video URLs and thumbnails.  
+
+5. Start your server and navigate to the app in your browser.  
 
 ---
 
