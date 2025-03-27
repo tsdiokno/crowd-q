@@ -4,72 +4,178 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>YouTube Song Queue</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background-color: #f4f4f4;
-    }
-    .body-container {
-      margin: 0 auto;
-      width: 780px;
-    }
-    h1 {
-      text-align: center;
-    }
-    #queue-display {
-      margin-top: 20px;
-      padding: 10px;
-      background-color: #fff;
-      border-radius: 5px;
-      border: 1px solid #ddd;
-    }
-    .queue-item {
-      margin: 10px 0;
-      padding: 5px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      display: flex;
+    :root {
+      --md-sys-color-primary: #FF8A00;
+      --md-sys-color-on-primary: #000000;
+      --md-sys-color-primary-container: #FFB74D;
+      --md-sys-color-on-primary-container: #000000;
+      --md-sys-color-surface: #1C1B1F;
+      --md-sys-color-on-surface: #E6E1E5;
+      --md-sys-color-surface-container: #2D2B2F;
+      --md-sys-color-on-surface-container: #E6E1E5;
+      --md-sys-color-error: #CF6679;
+      --md-sys-color-on-error: #000000;
     }
 
-    .queue-item > * {
-      margin: 5px;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-    
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: var(--md-sys-color-surface);
+      color: var(--md-sys-color-on-surface);
+      line-height: 1.5;
+    }
+
+    .body-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 32px;
+      color: var(--md-sys-color-primary);
+    }
+
+    .input-container {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: none;
+      background-color: var(--md-sys-color-surface-container);
+      color: var(--md-sys-color-on-surface-container);
+      font-size: 16px;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      outline: 2px solid var(--md-sys-color-primary);
+    }
+
+    button {
+      padding: 12px 24px;
+      border-radius: 12px;
+      border: none;
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: var(--md-sys-color-primary-container);
+    }
+
+    #queue-display {
+      background-color: var(--md-sys-color-surface-container);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      color: var(--md-sys-color-primary);
+      margin-bottom: 16px;
+    }
+
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background-color: var(--md-sys-color-surface);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      transition: transform 0.2s;
+    }
+
+    .queue-item:hover {
+      transform: translateY(-2px);
+    }
+
+    .queue-item-thumbnail {
+      width: 120px;
+      height: 68px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .queue-item-info {
+      flex: 1;
+    }
+
     .current-playing {
-      background-color: #e0ffe0;
+      border: 2px solid var(--md-sys-color-primary);
     }
+
     .control-buttons {
-      margin-top: 20px;
-      text-align: center;
-      display: none; /* Initially hidden */
+      display: none;
+      gap: 8px;
+      justify-content: center;
+      margin: 24px 0;
     }
-    iframe {
-      margin: 20px auto;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-    }
+
     #video-container {
-      display: block;
-      text-align: center;
-      display: none; /* Initially hidden */
+      display: none;
+      margin: 24px 0;
     }
+
+    iframe {
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
     .password-container {
-      display: block;
       text-align: center;
-      margin-top: 20px;
+      margin: 24px 0;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 48px;
+      padding: 24px;
+      background-color: var(--md-sys-color-surface-container);
+      border-radius: 16px;
+      font-size: 14px;
+      color: var(--md-sys-color-on-surface-container);
+    }
+
+    footer p {
+      margin-bottom: 12px;
+    }
+
+    footer strong {
+      color: var(--md-sys-color-primary);
     }
   </style>
 </head>
 <body>
 <div class="body-container">
-  <h1>YTM4 🤘🕺🎧🎶🎹🎶</h1>
+  <h1>YTM4 🎵</h1>
 
-  <label for="youtube-url">Paste YouTube URL:</label>
-  <input type="text" id="youtube-url" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
-  <button id="add-to-queue">Add to Queue</button>
-  <button id="refresh-button">Refresh Queue</button>
+  <div class="input-container">
+    <input type="text" id="youtube-url" placeholder="Paste YouTube URL here">
+    <button id="add-to-queue">Add</button>
+    <button id="refresh-button">Refresh</button>
+  </div>
 
   <div id="queue-display">
     <h2>Queue</h2>
@@ -77,7 +183,6 @@
   </div>
 
   <div id="video-container">
-    <!-- Initially, the iframe is hidden -->
     <div id="youtube-player"></div>
   </div>
 
@@ -88,12 +193,11 @@
   </div>
 
   <div class="password-container">
-    <label for="password">Enter password to control playback:</label>
-    <input type="password" id="password">
+    <input type="password" id="password" placeholder="Enter password to control playback">
     <button id="submit-password">Submit</button>
   </div>
 
-  <footer style="text-align: center; margin-top: 40px; font-size: 14px; color: #777;">
+  <footer>
     <p><strong>Made by Timothy</strong></p>
     <p>
       This app is similar to Spotify's Jam feature—a collaborative queue for YouTube music. It allows users to add songs to a shared queue, but playback is controlled by the host (who knows the password and has the equipment for centralized playback). 
@@ -102,11 +206,10 @@
       Individuals can use it if they guess the password, but I'm not sure what benefit it will give them using it alone if they could just make their own playlist or manually queue their own songs in the official app. If you happen to find this app by accident and are not in the same place as the one who controls the playback, this app might be pretty useless for you. 
     </p>
     <p>
-      It’s a very simple alternative to Spotify’s feature, designed for situations when only YouTube is available. The queue list automatically refreshes every 30 seconds, but you can manually refresh it so you'll know what's playing or what's been added by others on-demand. Enjoy the music, and remember, it’s only fun when you’re in the same place as the host! 🎶
+      It's a very simple alternative to Spotify's feature, designed for situations when only YouTube is available. The queue list automatically refreshes every 30 seconds, but you can manually refresh it so you'll know what's playing or what's been added by others on-demand. Enjoy the music, and remember, it's only fun when you're in the same place as the host! 🎶
     </p>
   </footer>
-  
-</div><!--.body-container-->
+</div>
 
   <script>
     let queue = [];
