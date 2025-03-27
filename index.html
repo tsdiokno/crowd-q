@@ -18,6 +18,8 @@
       --md-sys-color-on-surface-container: #E6E1E5;
       --md-sys-color-error: #CF6679;
       --md-sys-color-on-error: #000000;
+      --md-sys-color-link: #FFB74D;
+      --md-sys-color-on-link: #000000;
     }
 
     * {
@@ -122,6 +124,37 @@
       flex: 1;
     }
 
+    .queue-position {
+      color: var(--md-sys-color-on-surface);
+      font-size: 0.875rem;
+      margin-bottom: 4px;
+    }
+
+    .video-title {
+      color: var(--md-sys-color-on-surface);
+      font-weight: 500;
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+
+    .queue-item-info a {
+      color: var(--md-sys-color-link);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: color 0.2s;
+    }
+
+    .queue-item-info a:hover {
+      color: var(--md-sys-color-primary-container);
+    }
+
+    .queue-item-info .material-icons {
+      font-size: 16px;
+      vertical-align: middle;
+    }
+
     .current-playing {
       border: 2px solid var(--md-sys-color-primary);
     }
@@ -224,6 +257,9 @@
     const controlButtons = document.querySelector('.control-buttons');
     const videoContainer = document.querySelector('#video-container');
     const correctPassword = "12345"; // You can change this password in the JavaScript code
+    const YOUTUBE_API_KEY = "AIzaSyCQtE_Bd6-yssxNjPz0ed107ODUpAeXafA"; // Replace with your actual API key
+    const hasApiKey = YOUTUBE_API_KEY !== "YOUR_API_KEY";
+    const titleCache = new Map(); // Cache for video titles
 
     // Load queue from local storage or fetch from PHP
     function loadQueue() {
@@ -253,6 +289,42 @@
       return match ? match[1] : null;
     }
 
+    // Fetch video titles using YouTube Data API with batching
+    async function fetchVideoTitles(videoIds) {
+      if (!hasApiKey || !videoIds.length) return new Map();
+      
+      // Filter out already cached IDs
+      const uncachedIds = videoIds.filter(id => !titleCache.has(id));
+      if (!uncachedIds.length) return titleCache;
+
+      try {
+        // YouTube API allows up to 50 videos per request
+        const batchSize = 50;
+        const results = new Map();
+        
+        for (let i = 0; i < uncachedIds.length; i += batchSize) {
+          const batch = uncachedIds.slice(i, i + batchSize);
+          const response = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${batch.join(',')}&key=${YOUTUBE_API_KEY}`
+          );
+          const data = await response.json();
+          
+          if (data.items) {
+            data.items.forEach(item => {
+              results.set(item.id, item.snippet.title);
+            });
+          }
+        }
+
+        // Update cache with new results
+        results.forEach((title, id) => titleCache.set(id, title));
+        return titleCache;
+      } catch (error) {
+        console.error('Error fetching video titles:', error);
+        return titleCache;
+      }
+    }
+
     // Initialize YouTube Player
     function onYouTubeIframeAPIReady() {
       player = new YT.Player('youtube-player', {
@@ -272,14 +344,22 @@
     }
 
     // Add URL to queue and refresh display
-    addButton.addEventListener('click', () => {
+    addButton.addEventListener('click', async () => {
       const url = youtubeUrlInput.value.trim();
       const videoId = extractVideoId(url);
-      if (videoId && !queue.includes(url)) {
-        queue.push(url);
-        saveQueue(); // Save updated queue to server
+      if (videoId && !queue.some(item => item.url === url)) {
+        // Get title from cache or fetch if needed
+        const titles = await fetchVideoTitles([videoId]);
+        const title = titles.get(videoId) || null;
+        
+        queue.push({
+          url: url,
+          title: title,
+          videoId: videoId
+        });
+        saveQueue();
         updateQueueDisplay();
-        youtubeUrlInput.value = ''; // Clear input after adding
+        youtubeUrlInput.value = '';
       } else {
         alert('Invalid YouTube URL or already in queue');
       }
@@ -288,16 +368,34 @@
     // Update the queue display
     function updateQueueDisplay() {
       queueDisplay.innerHTML = '';
-      queue.forEach((url, index) => {
-        const videoId = extractVideoId(queue[index]);
+      if (!hasApiKey) {
+        const warningDiv = document.createElement('div');
+        warningDiv.style.cssText = `
+          background-color: var(--md-sys-color-error);
+          color: var(--md-sys-color-on-error);
+          padding: 12px;
+          border-radius: 8px;
+          margin-bottom: 16px;
+          font-size: 0.875rem;
+        `;
+        warningDiv.innerHTML = `
+          <span class="material-icons" style="vertical-align: middle; margin-right: 8px;">warning</span>
+          YouTube API key not configured. Video titles will not be displayed. To enable titles, replace the API key in the code.
+        `;
+        queueDisplay.appendChild(warningDiv);
+      }
+      queue.forEach((item, index) => {
         const div = document.createElement('div');
         div.classList.add('queue-item');
         div.innerHTML = `
-          <img class="queue-item-thumbnail" src="https://img.youtube.com/vi/${videoId}/3.jpg" alt="Thumbnail">
-          <div class="queue-item-info" >Queue Position: ${index + 1} <br> URL: ${url}</div>
+          <img class="queue-item-thumbnail" src="https://img.youtube.com/vi/${item.videoId}/3.jpg" alt="Thumbnail">
+          <div class="queue-item-info">
+            <div class="queue-position">Queue Position: ${index + 1}</div>
+            ${item.title ? `<div class="video-title">${item.title}</div>` : ''}
+            <a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.url} <span class="material-icons">open_in_new</span></a>
+          </div>
         `;
-        // div.textContent = `Song ${index + 1}: ${url} - ${videoId}`;
-        if (index === 0) div.classList.add('current-playing'); // Highlight the first song
+        if (index === 0) div.classList.add('current-playing');
         queueDisplay.appendChild(div);
       });
     }
@@ -305,9 +403,9 @@
     // Play the first song in the queue
     function playQueue() {
       if (queue.length > 0) {
-        const videoId = extractVideoId(queue[0]); // Extract VIDEO_ID
+        const videoId = queue[0].videoId;
         if (videoId) {
-          console.log(`Now playing: https://www.youtube.com/watch?v=${videoId}`);
+          console.log(`Now playing: ${queue[0].title}`);
           player.loadVideoById(videoId);
         } else {
           console.error('Invalid YouTube URL');
