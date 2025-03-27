@@ -257,9 +257,22 @@
     const controlButtons = document.querySelector('.control-buttons');
     const videoContainer = document.querySelector('#video-container');
     const correctPassword = "12345"; // You can change this password in the JavaScript code
-    const YOUTUBE_API_KEY = "YOUR_API_KEY"; // Replace with your actual API key
-    const hasApiKey = YOUTUBE_API_KEY !== "YOUR_API_KEY";
+    let YOUTUBE_API_KEY = null;
+    let hasApiKey = false;
     const titleCache = new Map(); // Cache for video titles
+
+    // Load configuration
+    async function loadConfig() {
+      try {
+        const response = await fetch('config.json');
+        const config = await response.json();
+        YOUTUBE_API_KEY = config.youtube_api_key;
+        hasApiKey = YOUTUBE_API_KEY && YOUTUBE_API_KEY !== "YOUR_API_KEY";
+      } catch (error) {
+        console.error('Error loading config:', error);
+        hasApiKey = false;
+      }
+    }
 
     // Load queue from local storage or fetch from PHP
     function loadQueue() {
@@ -457,7 +470,10 @@
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
     // Load queue from server when the page loads
-    window.onload = loadQueue;
+    window.onload = async () => {
+      await loadConfig();
+      loadQueue();
+    };
 
     // Reload Queue
     refreshButton.addEventListener('click', () => {

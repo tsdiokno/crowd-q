@@ -1,1 +1,14 @@
 queue.json
+
+# Configuration files with sensitive data
+config.json
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
