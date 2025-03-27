@@ -329,6 +329,25 @@
         });
     }
 
+    // Initialize polling for queue updates
+    let lastModified = 0;
+    function initPolling() {
+      // Check for updates every 5 seconds
+      setInterval(async () => {
+        try {
+          const response = await fetch('queue_updates.php');
+          const data = await response.json();
+          
+          if (data.lastModified > lastModified) {
+            loadQueue();
+            lastModified = data.lastModified;
+          }
+        } catch (error) {
+          console.error('Polling error:', error);
+        }
+      }, 5000);
+    }
+
     // Save queue to server-side PHP
     function saveQueue() {
       fetch('save_queue.php', {
@@ -518,14 +537,13 @@
     window.onload = async () => {
       await loadConfig();
       loadQueue();
+      initPolling();
     };
 
     // Reload Queue
     refreshButton.addEventListener('click', () => {
       loadQueue();
     });
-    
-    setInterval(loadQueue, 30000);
   </script>
 </body>
 </html>
