@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YouTube Song Queue</title>
+  <title>YouTube Song Queue - Sync Edition</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
@@ -216,11 +216,107 @@
       overflow: hidden;
     }
 
-    .password-container {
+    /* Add styles for the name input modal */
+    .name-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .name-modal-content {
+      background-color: var(--md-sys-color-surface-container);
+      padding: 32px;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 400px;
       text-align: center;
+    }
+
+    .name-modal h2 {
+      margin-bottom: 24px;
+    }
+
+    .name-modal input {
+      width: 100%;
+      margin-bottom: 16px;
+    }
+
+    /* Add styles for notifications */
+    .notification {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background-color: var(--md-sys-color-surface-container);
+      padding: 16px 24px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 1000;
+    }
+
+    .notification.show {
+      opacity: 1;
+    }
+
+    .notification .material-icons {
+      color: var(--md-sys-color-primary);
+    }
+
+    /* Add styles for the log section */
+    .log-section {
+      background-color: var(--md-sys-color-surface-container);
+      border-radius: 16px;
+      padding: 24px;
       margin: 32px auto;
       width: 100%;
       max-width: 640px;
+    }
+
+    .log-section h2 {
+      margin-bottom: 16px;
+    }
+
+    .log-entries {
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 0.875rem;
+    }
+
+    .log-entry {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background-color: var(--md-sys-color-surface);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      opacity: 0.8;
+    }
+
+    .log-entry .material-icons {
+      font-size: 16px;
+      color: var(--md-sys-color-primary);
+    }
+
+    .log-entry .timestamp {
+      color: var(--md-sys-color-on-surface);
+      opacity: 0.6;
+      font-size: 0.75rem;
+    }
+
+    .log-entry .user {
+      color: var(--md-sys-color-primary);
+      font-weight: 500;
     }
 
     footer {
@@ -247,11 +343,33 @@
       color: var(--md-sys-color-on-surface-container);
       opacity: 0.8;
     }
+
+    /* Add this to your existing styles */
+    .sync-playback-button {
+      display: none;
+      justify-content: center;
+      margin: 32px auto;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    .sync-playback-button button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 200px;
+      justify-content: center;
+      background-color: var(--md-sys-color-primary-container);
+    }
+
+    .sync-playback-button button:hover {
+      background-color: var(--md-sys-color-primary);
+    }
   </style>
 </head>
 <body>
 <div class="body-container">
-  <h1>YTM4 🎵</h1>
+  <h1>YTM4 - Sync Edition 🎵</h1>
 
   <div class="input-container">
     <input type="text" id="youtube-url" placeholder="Paste YouTube URL here">
@@ -274,9 +392,26 @@
     <button id="next-button"><span class="material-icons">skip_next</span> Next</button>
   </div>
 
-  <div class="password-container">
-    <input type="password" id="password" placeholder="Enter password to control playback">
-    <button id="submit-password">Submit</button>
+  <div class="sync-playback-button" id="sync-playback-button">
+    <button><span class="material-icons">sync</span> Sync Playback</button>
+  </div>
+
+  <div class="log-section">
+    <h2>Activity Log</h2>
+    <div class="log-entries" id="log-entries"></div>
+  </div>
+
+  <div class="name-modal" id="name-modal">
+    <div class="name-modal-content">
+      <h2>Enter Your Name</h2>
+      <input type="text" id="user-name" placeholder="Your name">
+      <button id="submit-name">Join Session</button>
+    </div>
+  </div>
+
+  <div class="notification" id="notification">
+    <span class="material-icons">info</span>
+    <span id="notification-text"></span>
   </div>
 
   <footer>
@@ -296,19 +431,35 @@
   <script>
     let queue = [];
     let player;
+    let userName = sessionStorage.getItem('userName');
+    let lastProcessedLogEntry = null; // Track the last processed log entry
+    let lastAction = null; // Track the last action regardless of user
     const queueDisplay = document.getElementById('queue-list');
     const youtubeUrlInput = document.getElementById('youtube-url');
     const addButton = document.getElementById('add-to-queue');
     const refreshButton = document.getElementById('refresh-button');
-    const passwordInput = document.getElementById('password');
-    const submitPasswordButton = document.getElementById('submit-password');
-    const passwordContainer = document.querySelector('.password-container');
+    const nameModal = document.getElementById('name-modal');
+    const userNameInput = document.getElementById('user-name');
+    const submitNameButton = document.getElementById('submit-name');
     const controlButtons = document.querySelector('.control-buttons');
     const videoContainer = document.querySelector('#video-container');
-    const correctPassword = "12345"; // You can change this password in the JavaScript code
+    const notification = document.getElementById('notification');
+    const notificationText = document.getElementById('notification-text');
     let YOUTUBE_API_KEY = null;
     let hasApiKey = false;
     const titleCache = new Map(); // Cache for video titles
+    const logEntries = document.getElementById('log-entries');
+    const syncPlaybackButton = document.getElementById('sync-playback-button');
+    let hasInitialSync = false;
+
+    // Show notification function
+    function showNotification(message) {
+      notificationText.textContent = message;
+      notification.classList.add('show');
+      setTimeout(() => {
+        notification.classList.remove('show');
+      }, 3000);
+    }
 
     // Load configuration
     async function loadConfig() {
@@ -324,13 +475,199 @@
     }
 
     // Load queue from local storage or fetch from PHP
-    function loadQueue() {
-      fetch('get_queue.php')  // Fetch the queue from the server-side PHP
-        .then(response => response.json())
-        .then(data => {
-          queue = data;
-          updateQueueDisplay();
+    async function loadQueue() {
+      try {
+        const response = await fetch('get_queue.php');
+        const data = await response.json();
+        
+        // Check if the current song has changed
+        if (queue.length > 0 && data.length > 0) {
+          const currentSong = queue[0];
+          const newCurrentSong = data[0];
+          
+          if (currentSong.videoId !== newCurrentSong.videoId) {
+            addLogEntry('Song Changed', newCurrentSong.title || newCurrentSong.url);
+          }
+        }
+        
+        queue = data;
+        updateQueueDisplay();
+      } catch (error) {
+        console.error('Error loading queue:', error);
+      }
+    }
+
+    // Load activity log from server
+    async function loadActivityLog() {
+      try {
+        const response = await fetch('get_log.php');
+        const data = await response.json();
+        
+        // Process the latest log entry for state changes first
+        if (data.entries && data.entries.length > 0) {
+          const latestEntry = data.entries[0];
+          processLogEntry(latestEntry);
+          
+          // Update button visibility based on sync state
+          if (hasInitialSync) {
+            syncPlaybackButton.style.display = 'none';
+            controlButtons.style.display = 'flex';
+          }
+        }
+        
+        // Then update the display
+        updateLogDisplay(data.entries);
+      } catch (error) {
+        console.error('Error loading activity log:', error);
+      }
+    }
+
+    // Process log entry for state changes
+    function processLogEntry(entry) {
+      // Skip if this is the same action as the last one we processed
+      if (lastProcessedLogEntry && lastProcessedLogEntry.action === entry.action) {
+        return;
+      }
+
+      // Update last processed entry
+      lastProcessedLogEntry = entry;
+
+      switch (entry.action.toLowerCase()) {
+        case 'play':
+          if (queue.length > 0) {
+            const videoId = queue[0].videoId;
+            if (videoId && player) {
+              // Load video muted to allow autoplay
+              player.loadVideoById({
+                videoId: videoId,
+                playerVars: {
+                  'autoplay': 1,
+                  'playsinline': 1,
+                  'enablejsapi': 1,
+                  'origin': window.location.origin,
+                  'mute': 1
+                }
+              });
+              
+              // Try to play multiple times to ensure it starts
+              let attempts = 0;
+              const maxAttempts = 5;
+              const playInterval = setInterval(() => {
+                if (attempts >= maxAttempts) {
+                  clearInterval(playInterval);
+                  return;
+                }
+                
+                const playerState = player.getPlayerState();
+                if (playerState === YT.PlayerState.PLAYING) {
+                  clearInterval(playInterval);
+                  return;
+                }
+                
+                player.playVideo();
+                attempts++;
+              }, 500);
+
+              if (entry.user !== userName) {
+                showNotification(`${entry.user} started playing ${queue[0].title || 'a song'}`);
+              }
+            }
+          }
+          break;
+        case 'pause':
+          if (player) {
+            player.pauseVideo();
+            if (entry.user !== userName) {
+              showNotification(`${entry.user} paused the video`);
+            }
+          }
+          break;
+        case 'next':
+          if (queue.length > 0) {
+            queue.shift();
+            saveQueue();
+            updateQueueDisplay();
+            if (queue.length > 0) {
+              const videoId = queue[0].videoId;
+              if (videoId && player) {
+                // Load next video muted to allow autoplay
+                player.loadVideoById({
+                  videoId: videoId,
+                  playerVars: {
+                    'autoplay': 1,
+                    'playsinline': 1,
+                    'enablejsapi': 1,
+                    'origin': window.location.origin,
+                    'mute': 1
+                  }
+                });
+                
+                // Try to play multiple times to ensure it starts
+                let attempts = 0;
+                const maxAttempts = 5;
+                const playInterval = setInterval(() => {
+                  if (attempts >= maxAttempts) {
+                    clearInterval(playInterval);
+                    return;
+                  }
+                  
+                  const playerState = player.getPlayerState();
+                  if (playerState === YT.PlayerState.PLAYING) {
+                    clearInterval(playInterval);
+                    return;
+                  }
+                  
+                  player.playVideo();
+                  attempts++;
+                }, 500);
+
+                if (entry.user !== userName) {
+                  showNotification(`${entry.user} skipped to ${queue[0].title || 'next song'}`);
+                }
+              }
+            }
+          }
+          break;
+        case 'add':
+          // Queue will be updated by the next loadQueue call
+          if (entry.user !== userName) {
+            showNotification(`${entry.user} added ${entry.details || 'a song'}`);
+          }
+          break;
+        case 'song changed':
+          // Queue will be updated by the next loadQueue call
+          if (entry.user !== userName) {
+            showNotification(`${entry.user} changed the song to ${entry.details || 'a new song'}`);
+          }
+          break;
+      }
+    }
+
+    // Update log display
+    function updateLogDisplay(entries) {
+      // Only update if the entries are different
+      const currentEntries = Array.from(logEntries.children).map(el => el.innerHTML);
+      const newEntries = entries.map(entry => `
+        <span class="timestamp">${entry.timestamp}</span>
+        <span class="user">${entry.user}</span>
+        <span class="material-icons">${getActionIcon(entry.action)}</span>
+        <span>${entry.action}${entry.details ? `: ${entry.details}` : ''}</span>
+      `);
+      
+      if (JSON.stringify(currentEntries) !== JSON.stringify(newEntries)) {
+        logEntries.innerHTML = '';
+        entries.forEach(entry => {
+          const div = document.createElement('div');
+          div.classList.add('log-entry');
+          div.innerHTML = `
+            <span class="timestamp">${entry.timestamp}</span>
+            <span class="user">${entry.user}</span>
+            <span class="material-icons">${getActionIcon(entry.action)}</span>
+            <span>${entry.action}${entry.details ? `: ${entry.details}` : ''}</span>
+          `;
+          logEntries.appendChild(div);
         });
+      }
     }
 
     // Save queue to server-side PHP
@@ -392,38 +729,154 @@
       player = new YT.Player('youtube-player', {
         height: '360',
         width: '640',
+        playerVars: {
+          'playsinline': 1,
+          'enablejsapi': 1,
+          'origin': window.location.origin,
+          'autoplay': 1,
+          'controls': 1,
+          'rel': 0,
+          'showinfo': 0,
+          'modestbranding': 1,
+          'fs': 1,
+          'cc_load_policy': 1,
+          'iv_load_policy': 3,
+          'enablejsapi': 1,
+          'widget_referrer': window.location.href
+        },
         events: {
-          'onStateChange': onPlayerStateChange
+          'onStateChange': onPlayerStateChange,
+          'onError': onPlayerError,
+          'onReady': onPlayerReady,
+          'onApiChange': onApiChange
         }
       });
     }
 
+    // Handle API change event
+    function onApiChange(event) {
+      console.log('API changed:', event);
+    }
+
+    // Handle player ready event
+    async function onPlayerReady(event) {
+      console.log('Player is ready');
+      // Store player state
+      window.playerState = {
+        isPlaying: false,
+        currentVideoId: null
+      };
+      // Enable programmatic control
+      event.target.setPlaybackQuality('default');
+      event.target.setPlaybackRate(1);
+
+      // Show sync button initially
+      syncPlaybackButton.style.display = 'flex';
+      controlButtons.style.display = 'none';
+    }
+
+    // Handle player errors
+    function onPlayerError(event) {
+      console.error('Player error:', event.data);
+      showNotification('Error playing video. Please try again.');
+    }
+
     // Handle YouTube Player state changes
     function onPlayerStateChange(event) {
+      console.log('Player state changed:', event.data);
+      // Update stored state
+      if (window.playerState) {
+        window.playerState.isPlaying = event.data === YT.PlayerState.PLAYING;
+        window.playerState.currentVideoId = player.getVideoData().video_id;
+      }
+
       if (event.data === YT.PlayerState.ENDED) {
         nextSong();
       }
     }
 
-    // Add URL to queue and refresh display
-    addButton.addEventListener('click', async () => {
-      const url = youtubeUrlInput.value.trim();
-      const videoId = extractVideoId(url);
-      if (videoId && !queue.some(item => item.url === url)) {
-        // Get title from cache or fetch if needed
-        const titles = await fetchVideoTitles([videoId]);
-        const title = titles.get(videoId) || null;
-        
-        queue.push({
-          url: url,
-          title: title,
-          videoId: videoId
-        });
-        saveQueue();
-        updateQueueDisplay();
-        youtubeUrlInput.value = '';
+    // Modify playQueue function to only add log entry
+    function playQueue() {
+      if (queue.length > 0) {
+        const videoId = queue[0].videoId;
+        if (videoId) {
+          console.log(`Now playing: ${queue[0].title}`);
+          // Only add log entry, actual playback will be handled by processLogEntry
+          addLogEntry('Play', queue[0].title);
+        } else {
+          console.error('Invalid YouTube URL');
+          showNotification('Invalid video URL');
+        }
       } else {
-        alert('Invalid YouTube URL or already in queue');
+        console.log('Queue is empty');
+        showNotification('Queue is empty');
+      }
+    }
+
+    // Modify nextSong function to only add log entry
+    function nextSong() {
+      if (queue.length > 0) {
+        // Only add log entry, actual next song will be handled by processLogEntry
+        addLogEntry('Next');
+      } else {
+        console.log('No more songs in the queue');
+      }
+    }
+
+    // Modify pause button handler to only add log entry
+    document.getElementById('pause-button').addEventListener('click', () => {
+      addLogEntry('Pause');
+    });
+
+    // Modify next button handler to only add log entry
+    document.getElementById('next-button').addEventListener('click', nextSong);
+
+    // Add play button event listener
+    document.getElementById('play-button').addEventListener('click', playQueue);
+
+    // Initial queue display
+    updateQueueDisplay();
+
+    // Load the YouTube Iframe API
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // Load queue from server when the page loads
+    window.onload = async () => {
+      await loadConfig();
+      loadQueue();
+      // Poll for queue updates every 5 seconds
+      setInterval(loadQueue, 5000);
+      // Poll for activity log updates every 2 seconds
+      setInterval(loadActivityLog, 2000);
+    };
+
+    // Reload Queue
+    refreshButton.addEventListener('click', () => {
+      loadQueue();
+    });
+
+    // Show name modal if no name is set
+    if (!userName) {
+      nameModal.style.display = 'flex';
+    } else {
+      videoContainer.style.display = 'block';
+      syncPlaybackButton.style.display = 'flex';
+      controlButtons.style.display = 'none';
+    }
+
+    // Handle name submission
+    submitNameButton.addEventListener('click', () => {
+      const name = userNameInput.value.trim();
+      if (name) {
+        userName = name;
+        sessionStorage.setItem('userName', name);
+        nameModal.style.display = 'none';
+        videoContainer.style.display = 'block';
+        syncPlaybackButton.style.display = 'flex';
+        controlButtons.style.display = 'none';
       }
     });
 
@@ -462,73 +915,165 @@
       });
     }
 
-    // Play the first song in the queue
-    function playQueue() {
-      if (queue.length > 0) {
-        const videoId = queue[0].videoId;
-        if (videoId) {
-          console.log(`Now playing: ${queue[0].title}`);
-          player.loadVideoById(videoId);
-        } else {
-          console.error('Invalid YouTube URL');
-        }
-      } else {
-        console.log('Queue is empty');
+    // Get icon for different actions
+    function getActionIcon(action) {
+      switch (action.toLowerCase()) {
+        case 'play':
+          return 'play_arrow';
+        case 'pause':
+          return 'pause';
+        case 'next':
+          return 'skip_next';
+        case 'add':
+          return 'add';
+        case 'remove':
+          return 'remove';
+        default:
+          return 'info';
       }
     }
 
-    // Play the next song in the queue
-    function nextSong() {
-      if (queue.length > 0) {
-        queue.shift(); // Remove the first song (the one that was just played)
-        saveQueue(); // Save updated queue to server
+    // Add URL to queue and refresh display
+    addButton.addEventListener('click', async () => {
+      const url = youtubeUrlInput.value.trim();
+      const videoId = extractVideoId(url);
+      if (videoId && !queue.some(item => item.url === url)) {
+        // Get title from cache or fetch if needed
+        const titles = await fetchVideoTitles([videoId]);
+        const title = titles.get(videoId) || null;
+        
+        queue.push({
+          url: url,
+          title: title,
+          videoId: videoId
+        });
+        saveQueue();
         updateQueueDisplay();
-        playQueue(); // Play the next song
+        youtubeUrlInput.value = '';
+        addLogEntry('Add', title || url);
+        // Immediately load activity log after adding
+        loadActivityLog();
       } else {
-        console.log('No more songs in the queue');
+        alert('Invalid YouTube URL or already in queue');
+      }
+    });
+
+    // Add log entry function
+    async function addLogEntry(action, details = '') {
+      try {
+        // First check the latest log entry from server
+        const response = await fetch('get_log.php');
+        const data = await response.json();
+        
+        // Skip if this is the same action as the latest server entry
+        if (data.entries && data.entries.length > 0) {
+          const latestEntry = data.entries[0];
+          if (latestEntry.action === action) {
+            return;
+          }
+        }
+
+        // Create timestamp in 12-hour format with consistent options
+        const timestamp = new Date().toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+          timeZone: 'UTC' // Use UTC to ensure consistent time across users
+        });
+        
+        // Send log entry to server immediately
+        fetch('update_log.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            timestamp: timestamp,
+            user: userName,
+            action: action,
+            details: details
+          })
+        });
+        
+        // Update local display immediately
+        const entry = document.createElement('div');
+        entry.classList.add('log-entry');
+        entry.innerHTML = `
+          <span class="timestamp">${timestamp}</span>
+          <span class="user">${userName}</span>
+          <span class="material-icons">${getActionIcon(action)}</span>
+          <span>${action}${details ? `: ${details}` : ''}</span>
+        `;
+        logEntries.insertBefore(entry, logEntries.firstChild);
+        
+        // Keep only the last 50 entries
+        while (logEntries.children.length > 50) {
+          logEntries.removeChild(logEntries.lastChild);
+        }
+      } catch (error) {
+        console.error('Error adding log entry:', error);
       }
     }
 
-    // Handle password submission and controls
-    submitPasswordButton.addEventListener('click', () => {
-      const enteredPassword = passwordInput.value;
-      if (enteredPassword === correctPassword) {
-        localStorage.setItem('password', correctPassword); // Store password in localStorage
-        passwordContainer.style.display = 'none'; // Hide the password input if correct
-        controlButtons.style.display = 'flex'; // Show the control buttons with flex display
-        videoContainer.style.display = 'block'; // Show the iframe
-      } else {
-        alert('Incorrect password');
+    // Add sync playback button click handler
+    syncPlaybackButton.addEventListener('click', async () => {
+      try {
+        // First, play the current video
+        if (queue.length > 0) {
+          const videoId = queue[0].videoId;
+          if (videoId && player) {
+            // Load video muted to allow autoplay
+            player.loadVideoById({
+              videoId: videoId,
+              playerVars: {
+                'autoplay': 1,
+                'playsinline': 1,
+                'enablejsapi': 1,
+                'origin': window.location.origin,
+                'mute': 1
+              }
+            });
+            
+            // Try to play multiple times to ensure it starts
+            let attempts = 0;
+            const maxAttempts = 5;
+            const playInterval = setInterval(() => {
+              if (attempts >= maxAttempts) {
+                clearInterval(playInterval);
+                return;
+              }
+              
+              const playerState = player.getPlayerState();
+              if (playerState === YT.PlayerState.PLAYING) {
+                clearInterval(playInterval);
+                return;
+              }
+              
+              player.playVideo();
+              attempts++;
+            }, 500);
+
+            // After a short delay, process the latest log entry
+            setTimeout(async () => {
+              const response = await fetch('get_log.php');
+              const data = await response.json();
+              
+              if (data.entries && data.entries.length > 0) {
+                const latestEntry = data.entries[0];
+                processLogEntry(latestEntry);
+              }
+              
+              // Hide sync button and show regular controls
+              syncPlaybackButton.style.display = 'none';
+              controlButtons.style.display = 'flex';
+              hasInitialSync = true;
+            }, 1000);
+          }
+        }
+      } catch (error) {
+        console.error('Error syncing playback:', error);
       }
-    });
-
-    // Bind play, pause, and next buttons
-    document.getElementById('play-button').addEventListener('click', playQueue);
-    document.getElementById('pause-button').addEventListener('click', () => {
-      player.pauseVideo();
-    });
-    document.getElementById('next-button').addEventListener('click', nextSong);
-
-    // Initial queue display
-    updateQueueDisplay();
-
-    // Load the YouTube Iframe API
-    const tag = document.createElement('script');
-    tag.src = "https://www.youtube.com/iframe_api";
-    const firstScriptTag = document.getElementsByTagName('script')[0];
-    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-    // Load queue from server when the page loads
-    window.onload = async () => {
-      await loadConfig();
-      loadQueue();
-      // Poll for updates every 5 seconds
-      setInterval(loadQueue, 5000);
-    };
-
-    // Reload Queue
-    refreshButton.addEventListener('click', () => {
-      loadQueue();
     });
   </script>
 </body>
