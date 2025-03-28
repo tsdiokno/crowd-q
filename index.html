@@ -392,6 +392,13 @@
     <button id="next-button"><span class="material-icons">skip_next</span> Next</button>
   </div>
 
+  <!-- Hidden programmatic controls that only receive events -->
+  <div class="control-buttons" style="display: none;">
+    <button id="programmatic-play-button"><span class="material-icons">play_arrow</span> Play</button>
+    <button id="programmatic-pause-button"><span class="material-icons">pause</span> Pause</button>
+    <button id="programmatic-next-button"><span class="material-icons">skip_next</span> Next</button>
+  </div>
+
   <div class="sync-playback-button" id="sync-playback-button">
     <button><span class="material-icons">sync</span> Sync Playback</button>
   </div>
@@ -526,120 +533,65 @@
     function processLogEntry(entry) {
       // Skip if this is the same action as the last one we processed
       if (lastProcessedLogEntry && lastProcessedLogEntry.action === entry.action) {
-        return;
+      return;
       }
 
       // Update last processed entry
       lastProcessedLogEntry = entry;
 
       switch (entry.action.toLowerCase()) {
+
         case 'play':
-          if (queue.length > 0) {
+          if (queue.length > 0 && player) {
             const videoId = queue[0].videoId;
-            if (videoId && player) {
-              // Load video muted to allow autoplay
+            if (videoId) {
               player.loadVideoById({
-                videoId: videoId,
-                playerVars: {
-                  'autoplay': 1,
-                  'playsinline': 1,
-                  'enablejsapi': 1,
-                  'origin': window.location.origin,
-                  'mute': 1
-                }
+              videoId: videoId,
+              playerVars: {
+                'autoplay': 1,
+                'playsinline': 1,
+                'enablejsapi': 1,
+                'origin': window.location.origin,
+                'start': entry.position || 0
+              }
               });
-              
-              // Try to play multiple times to ensure it starts
-              let attempts = 0;
-              const maxAttempts = 5;
-              const playInterval = setInterval(() => {
-                if (attempts >= maxAttempts) {
-                  clearInterval(playInterval);
-                  return;
-                }
-                
-                const playerState = player.getPlayerState();
-                if (playerState === YT.PlayerState.PLAYING) {
-                  clearInterval(playInterval);
-                  return;
-                }
-                
-                player.playVideo();
-                attempts++;
-              }, 500);
 
               if (entry.user !== userName) {
-                showNotification(`${entry.user} started playing ${queue[0].title || 'a song'}`);
+              showNotification(`${entry.user} started playing ${queue[0].title || 'a song'}`);
               }
+
+              console.log('Playing video:', queue[0].title || 'a song', 'at position:', entry.position || 0);
+
             }
           }
           break;
+
         case 'pause':
           if (player) {
-            player.pauseVideo();
-            if (entry.user !== userName) {
-              showNotification(`${entry.user} paused the video`);
-            }
-          }
-          break;
-        case 'next':
-          if (queue.length > 0) {
-            queue.shift();
-            saveQueue();
-            updateQueueDisplay();
-            if (queue.length > 0) {
-              const videoId = queue[0].videoId;
-              if (videoId && player) {
-                // Load next video muted to allow autoplay
-                player.loadVideoById({
-                  videoId: videoId,
-                  playerVars: {
-                    'autoplay': 1,
-                    'playsinline': 1,
-                    'enablejsapi': 1,
-                    'origin': window.location.origin,
-                    'mute': 1
-                  }
-                });
-                
-                // Try to play multiple times to ensure it starts
-                let attempts = 0;
-                const maxAttempts = 5;
-                const playInterval = setInterval(() => {
-                  if (attempts >= maxAttempts) {
-                    clearInterval(playInterval);
-                    return;
-                  }
-                  
-                  const playerState = player.getPlayerState();
-                  if (playerState === YT.PlayerState.PLAYING) {
-                    clearInterval(playInterval);
-                    return;
-                  }
-                  
-                  player.playVideo();
-                  attempts++;
-                }, 500);
 
-                if (entry.user !== userName) {
-                  showNotification(`${entry.user} skipped to ${queue[0].title || 'next song'}`);
-                }
-              }
+            player.pauseVideo();
+
+            if (entry.user !== userName) {
+
+              showNotification(`${entry.user} paused the video`);
+              console.log('Pausing video at position:', entry.position || 0);
             }
+
           }
           break;
+
         case 'add':
-          // Queue will be updated by the next loadQueue call
           if (entry.user !== userName) {
-            showNotification(`${entry.user} added ${entry.details || 'a song'}`);
+          showNotification(`${entry.user} added a song to the queue`);
           }
           break;
+
         case 'song changed':
-          // Queue will be updated by the next loadQueue call
           if (entry.user !== userName) {
-            showNotification(`${entry.user} changed the song to ${entry.details || 'a new song'}`);
+          showNotification(`${entry.user} changed the song`);
           }
           break;
+
       }
     }
 
@@ -783,7 +735,7 @@
 
     // Handle YouTube Player state changes
     function onPlayerStateChange(event) {
-      console.log('Player state changed:', event.data);
+      // console.log('Player state changed:', event.data);
       // Update stored state
       if (window.playerState) {
         window.playerState.isPlaying = event.data === YT.PlayerState.PLAYING;
@@ -795,44 +747,77 @@
       }
     }
 
-    // Modify playQueue function to only add log entry
-    function playQueue() {
-      if (queue.length > 0) {
-        const videoId = queue[0].videoId;
-        if (videoId) {
-          console.log(`Now playing: ${queue[0].title}`);
-          // Only add log entry, actual playback will be handled by processLogEntry
-          addLogEntry('Play', queue[0].title);
-        } else {
-          console.error('Invalid YouTube URL');
-          showNotification('Invalid video URL');
-        }
-      } else {
-        console.log('Queue is empty');
-        showNotification('Queue is empty');
-      }
-    }
+    // Add play button event listener
 
-    // Modify nextSong function to only add log entry
-    function nextSong() {
-      if (queue.length > 0) {
-        // Only add log entry, actual next song will be handled by processLogEntry
-        addLogEntry('Next');
-      } else {
-        console.log('No more songs in the queue');
-      }
-    }
+    document.getElementById('play-button').addEventListener('click', playQueue);
 
-    // Modify pause button handler to only add log entry
+    // Modify pause button handler to log position and pause the video
+
     document.getElementById('pause-button').addEventListener('click', () => {
-      addLogEntry('Pause');
+
+      if (player) {
+
+        player.pauseVideo(); // Explicitly pause the video
+        const currentPosition = player.getCurrentTime();
+        
+        
+        addLogEntry('Pause', '', currentPosition);
+        console.log('Manually Pausing video at position:', currentPosition);
+        console.log('JSON:', queue[0]);
+      }
     });
 
-    // Modify next button handler to only add log entry
-    document.getElementById('next-button').addEventListener('click', nextSong);
+    // Modify playQueue function to use last pause position
+    async function playQueue() {
 
-    // Add play button event listener
-    document.getElementById('play-button').addEventListener('click', playQueue);
+      if (queue.length > 0) {
+
+        const videoId = queue[0].videoId;
+
+        if (videoId) {
+          
+          // Fetch latest log entries
+          const response = await fetch('get_log.php');
+          const data = await response.json();
+
+          // Check if the most recent log entry has the action "pause"
+          if (data.entries && data.entries.length > 0 && data.entries[0].action.toLowerCase() === 'pause') {
+
+            const lastPauseEntry = data.entries[0];
+            const startPosition = lastPauseEntry.position || 0;
+
+            // Add log entry with the position
+            addLogEntry('Play', queue[0].title, startPosition);
+            player.seekTo(startPosition, true); // Seek to the last pause position
+            player.playVideo();
+            console.log('Manually Playing video at position:', startPosition);
+            console.log('JSON:', queue[0]);
+
+          } else {
+
+            // Add log entry without position if no recent pause
+            addLogEntry('Play', queue[0].title);
+            console.log('JSON:', queue[0]);
+            player.playVideo();
+            
+          }
+
+        } else {
+
+          showNotification('Invalid video URL');
+
+        }
+
+      } else {
+
+        showNotification('Queue is empty');
+
+      }
+    }
+
+    
+
+
 
     // Initial queue display
     updateQueueDisplay();
@@ -959,7 +944,7 @@
     });
 
     // Add log entry function
-    async function addLogEntry(action, details = '') {
+    async function addLogEntry(action, details = '', position = null) {
       try {
         // First check the latest log entry from server
         const response = await fetch('get_log.php');
@@ -992,7 +977,8 @@
             timestamp: timestamp,
             user: userName,
             action: action,
-            details: details
+            details: details,
+            position: position
           })
         });
         
@@ -1003,7 +989,7 @@
           <span class="timestamp">${timestamp}</span>
           <span class="user">${userName}</span>
           <span class="material-icons">${getActionIcon(action)}</span>
-          <span>${action}${details ? `: ${details}` : ''}</span>
+          <span>${action}${details ? `: ${details}` : ''}${position !== null ? ` at ${position}` : ''}</span>
         `;
         logEntries.insertBefore(entry, logEntries.firstChild);
         
@@ -1019,60 +1005,24 @@
     // Add sync playback button click handler
     syncPlaybackButton.addEventListener('click', async () => {
       try {
-        // First, play the current video
-        if (queue.length > 0) {
-          const videoId = queue[0].videoId;
-          if (videoId && player) {
-            // Load video muted to allow autoplay
-            player.loadVideoById({
-              videoId: videoId,
-              playerVars: {
-                'autoplay': 1,
-                'playsinline': 1,
-                'enablejsapi': 1,
-                'origin': window.location.origin,
-                'mute': 1
-              }
-            });
-            
-            // Try to play multiple times to ensure it starts
-            let attempts = 0;
-            const maxAttempts = 5;
-            const playInterval = setInterval(() => {
-              if (attempts >= maxAttempts) {
-                clearInterval(playInterval);
-                return;
-              }
-              
-              const playerState = player.getPlayerState();
-              if (playerState === YT.PlayerState.PLAYING) {
-                clearInterval(playInterval);
-                return;
-              }
-              
-              player.playVideo();
-              attempts++;
-            }, 500);
-
-            // After a short delay, process the latest log entry
-            setTimeout(async () => {
-              const response = await fetch('get_log.php');
-              const data = await response.json();
-              
-              if (data.entries && data.entries.length > 0) {
-                const latestEntry = data.entries[0];
-                processLogEntry(latestEntry);
-              }
-              
-              // Hide sync button and show regular controls
-              syncPlaybackButton.style.display = 'none';
-              controlButtons.style.display = 'flex';
-              hasInitialSync = true;
-            }, 1000);
-          }
+        // First, fetch the latest log entry
+        const response = await fetch('get_log.php');
+        const data = await response.json();
+        
+        if (data.entries && data.entries.length > 0) {
+          const latestEntry = data.entries[0];
+          
+          // Process the latest entry to sync playback
+          processLogEntry(latestEntry);
+          
+          // Hide sync button and show regular controls
+          syncPlaybackButton.style.display = 'none';
+          controlButtons.style.display = 'flex';
+          hasInitialSync = true;
         }
       } catch (error) {
         console.error('Error syncing playback:', error);
+        showNotification('Error syncing playback. Please try again.');
       }
     });
   </script>
