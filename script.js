@@ -51,13 +51,16 @@ async function loadConfig() {
 
 // Load queue from server
 async function loadQueue() {
+  console.log('loadQueue started');
   try {
     const response = await fetch('get_queue.php');
+    console.log('Queue fetch response:', response);
     const data = await response.json();
-    console.log('Loaded queue:', data); // Debug log
+    console.log('Loaded queue data:', data);
     
     queue = data;
     updateQueueDisplay();
+    console.log('Queue display updated');
   } catch (error) {
     console.error('Error loading queue:', error);
   }
@@ -65,11 +68,14 @@ async function loadQueue() {
 
 // Load current video from server
 async function loadCurrentVideo() {
+  console.log('loadCurrentVideo started');
   try {
     const response = await fetch('get_current_video.php');
+    console.log('Current video fetch response:', response);
     currentVideo = await response.json();
-    console.log('Loaded current video:', currentVideo); // Debug log
+    console.log('Loaded current video:', currentVideo);
     updateCurrentVideoDisplay();
+    console.log('Current video display updated');
   } catch (error) {
     console.error('Error loading current video:', error);
   }
@@ -159,9 +165,84 @@ async function onPlayerReady(event) {
   event.target.setPlaybackRate(1);
   event.target.unMute(); // Unmute after player is ready
 
-  // Show sync button initially
-  syncPlaybackButton.style.display = 'flex';
-  controlButtons.style.display = 'none';
+  // Get current video data
+  try {
+    const response = await fetch('get_current_video.php');
+    const currentVideoData = await response.json();
+    console.log('Current video data on player ready:', currentVideoData);
+
+    if (currentVideoData && currentVideoData.videoId) {
+      // Get the current position and action from the status
+      let currentPosition = currentVideoData.status?.position || 0;
+      const currentAction = currentVideoData.status?.action || 'Play';
+      const lastUpdateTime = currentVideoData.status?.timestamp;
+
+      // If video is playing, calculate approximate current position
+      if (currentAction === 'Play' && lastUpdateTime) {
+        // Parse the timestamp string (format: "2:30:45 PM")
+        const [time, period] = lastUpdateTime.split(' ');
+        const [hours, minutes, seconds] = time.split(':').map(Number);
+        const isPM = period === 'PM';
+        
+        // Create a date object for today with the parsed time
+        const now = new Date();
+        let lastUpdate = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          isPM ? hours + 12 : hours,
+          minutes,
+          seconds
+        );
+        
+        // If the calculated time is in the future, it means it's from yesterday
+        if (lastUpdate > now) {
+          lastUpdate.setDate(lastUpdate.getDate() - 1);
+        }
+        
+        const elapsedSeconds = Math.floor((now - lastUpdate) / 1000);
+        currentPosition += elapsedSeconds;
+      }
+
+      // Load the video immediately
+      player.loadVideoById({
+        videoId: currentVideoData.videoId,
+        playerVars: {
+          'autoplay': 0,
+          'playsinline': 1,
+          'enablejsapi': 1,
+          'origin': window.location.origin,
+          'start': currentPosition,
+          'mute': 1,
+          'rel': 0,
+          'showinfo': 0,
+          'modestbranding': 1,
+          'fs': 1,
+          'cc_load_policy': 1,
+          'iv_load_policy': 3,
+          'controls': 1,
+          'disablekb': 0,
+          'enablejsapi': 1,
+          'widget_referrer': window.location.href,
+          'vq': 'hd720'
+        }
+      });
+
+      // Hide sync button and show controls since we're already synced
+      syncPlaybackButton.style.display = 'none';
+      controlButtons.style.display = 'flex';
+      hasInitialSync = true;
+    } else {
+      // Show sync button if no current video
+      syncPlaybackButton.style.display = 'flex';
+      controlButtons.style.display = 'none';
+    }
+  } catch (error) {
+    console.error('Error loading current video on player ready:', error);
+    // Show sync button on error
+    syncPlaybackButton.style.display = 'flex';
+    controlButtons.style.display = 'none';
+  }
 }
 
 // Handle player errors
@@ -186,6 +267,36 @@ function onPlayerError(event) {
       errorMessage += 'Please try again.';
   }
   showNotification(errorMessage);
+  
+  // Try to reload the video if it's a temporary error
+  if (event.data === 5 && player) {
+    setTimeout(() => {
+      const currentVideoId = player.getVideoData().video_id;
+      if (currentVideoId) {
+        player.loadVideoById({
+          videoId: currentVideoId,
+          playerVars: {
+            'autoplay': 0,
+            'playsinline': 1,
+            'enablejsapi': 1,
+            'origin': window.location.origin,
+            'controls': 1,
+            'rel': 0,
+            'showinfo': 0,
+            'modestbranding': 1,
+            'fs': 1,
+            'cc_load_policy': 1,
+            'iv_load_policy': 3,
+            'enablejsapi': 1,
+            'widget_referrer': window.location.href,
+            'mute': 1,
+            'disablekb': 0,
+            'vq': 'hd720'
+          }
+        });
+      }
+    }, 2000);
+  }
 }
 
 // Handle YouTube Player state changes
@@ -216,14 +327,8 @@ async function addLogEntry(action, details = '', position = null) {
       return;
     }
 
-    // Create timestamp in 12-hour format with consistent options
-    const timestamp = new Date().toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-      timeZone: 'UTC'
-    });
+    // Create UTC timestamp
+    const timestamp = new Date().toISOString();
 
     // Update the current video status
     if (currentVideoData && currentVideoData.videoId) {
@@ -383,6 +488,30 @@ function getStatusIcon(action) {
       return 'info';
   }
 }
+
+// Name submission handler - moved outside setupEventListeners
+submitNameButton.addEventListener('click', async () => {
+  console.log('Submit name button clicked');
+  const name = userNameInput.value.trim();
+  console.log('Entered name:', name);
+  
+  if (name) {
+    console.log('Valid name entered, updating userName');
+    userName = name;
+    sessionStorage.setItem('userName', name);
+    console.log('userName saved to sessionStorage');
+    
+    nameModal.style.display = 'none';
+    console.log('Modal hidden');
+    
+    console.log('Starting app initialization...');
+    // Initialize the app after setting the name
+    await initializeApp();
+    console.log('App initialization completed');
+  } else {
+    console.log('No name entered');
+  }
+});
 
 // Set up all event listeners
 function setupEventListeners() {
@@ -547,17 +676,29 @@ function setupEventListeners() {
 
   // Play button click handler - updates current video state
   document.getElementById('play-button').addEventListener('click', async () => {
-    if (currentVideo && currentVideo.videoId) {
-      const currentPosition = player ? player.getCurrentTime() : 0;
-      addLogEntry('Play', currentVideo.title, currentPosition);
+    if (currentVideo && currentVideo.videoId && player) {
+      const currentPosition = player.getCurrentTime();
+      console.log('Playing video at position:', currentPosition);
+      
+      // First play the video
+      player.playVideo();
+      
+      // Then update the status
+      await addLogEntry('Play', currentVideo.title, currentPosition);
     }
   });
 
   // Pause button click handler - updates current video state
-  document.getElementById('pause-button').addEventListener('click', () => {
+  document.getElementById('pause-button').addEventListener('click', async () => {
     if (currentVideo && currentVideo.videoId && player) {
       const currentPosition = player.getCurrentTime();
-      addLogEntry('Pause', '', currentPosition);
+      console.log('Pausing video at position:', currentPosition);
+      
+      // First pause the video
+      player.pauseVideo();
+      
+      // Then update the status
+      await addLogEntry('Pause', currentVideo.title, currentPosition);
     }
   });
 
@@ -571,99 +712,183 @@ function setupEventListeners() {
   // Sync playback button click handler
   syncPlaybackButton.addEventListener('click', async () => {
     try {
+      console.log('=== SYNC PLAYBACK STARTED ===');
       const response = await fetch('get_current_video.php');
       const currentVideoData = await response.json();
+      console.log('Current video data received:', JSON.stringify(currentVideoData, null, 2));
       
       if (currentVideoData && currentVideoData.videoId && player) {
-        // Add log entry for sync
-        addLogEntry('Play', currentVideoData.title, currentVideoData.status?.position || 0);
+        const currentAction = currentVideoData.status?.action || 'Play';
+        const lastUpdateTime = currentVideoData.status?.timestamp;
+        const lastUpdatePosition = currentVideoData.status?.position || 0;
         
-        // Load and play video
-        player.loadVideoById({
-          videoId: currentVideoData.videoId,
-          playerVars: {
-            'autoplay': 1,
-            'playsinline': 1,
-            'enablejsapi': 1,
-            'origin': window.location.origin,
-            'start': currentVideoData.status?.position || 0,
-            'mute': 1,
-            'rel': 0,
-            'showinfo': 0,
-            'modestbranding': 1,
-            'fs': 1,
-            'cc_load_policy': 1,
-            'iv_load_policy': 3
+        console.log('=== INITIAL SYNC DATA ===');
+        console.log('Action:', currentAction);
+        console.log('Last Update Position:', lastUpdatePosition);
+        console.log('Last Update Time:', lastUpdateTime);
+        console.log('Full Status Object:', JSON.stringify(currentVideoData.status, null, 2));
+
+        // If video is playing, calculate current position and reload
+        if (currentAction === 'Play' && lastUpdateTime) {
+          console.log('=== CALCULATING PLAYBACK POSITION ===');
+          
+          // Create date objects from UTC timestamps
+          const now = new Date();
+          let lastUpdate;
+          
+          try {
+            // Try parsing as ISO string first
+            lastUpdate = new Date(lastUpdateTime);
+            
+            // Validate the date
+            if (isNaN(lastUpdate.getTime())) {
+              console.error('Invalid date from ISO string, trying alternative format');
+              // If ISO parsing fails, try parsing as local time string
+              const [time, period] = lastUpdateTime.split(' ');
+              const [hours, minutes, seconds] = time.split(':').map(Number);
+              const isPM = period === 'PM';
+              
+              lastUpdate = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                isPM ? hours + 12 : hours,
+                minutes,
+                seconds
+              );
+              
+              // If the calculated time is in the future, it means it's from yesterday
+              if (lastUpdate > now) {
+                lastUpdate.setDate(lastUpdate.getDate() - 1);
+              }
+            }
+          } catch (error) {
+            console.error('Error parsing date:', error);
+            // If all parsing fails, use current time
+            lastUpdate = now;
           }
-        });
+          
+          // Calculate elapsed time in milliseconds
+          const elapsedMilliseconds = now.getTime() - lastUpdate.getTime();
+          console.log('Time Difference (milliseconds):', elapsedMilliseconds);
+          
+          // Convert milliseconds to seconds with proper rounding
+          // We divide by 1000 to convert to seconds, then round to nearest second
+          const elapsedSeconds = Math.round(elapsedMilliseconds / 1000);
+          console.log('Elapsed Seconds:', elapsedSeconds);
+          
+          // Calculate final position by adding elapsed seconds to last update position
+          const currentPosition = lastUpdatePosition + elapsedSeconds;
+          
+          console.log('=== POSITION CALCULATION ===');
+          console.log('Last Update Position (seconds):', lastUpdatePosition);
+          console.log('Last Update Time:', lastUpdate.toLocaleString());
+          console.log('Current Time:', now.toLocaleString());
+          console.log('Final Calculated Position (seconds):', currentPosition);
+
+          // First stop the current video
+          player.stopVideo();
+
+          // Then load the video with the calculated position
+          console.log('Loading video with calculated position:', currentPosition);
+          player.loadVideoById({
+            videoId: currentVideoData.videoId,
+            startSeconds: currentPosition,
+            suggestedQuality: 'hd720'
+          });
+
+          // Wait for the video to be ready before playing
+          const checkPlayer = setInterval(() => {
+            const playerState = player.getPlayerState();
+            console.log('Current player state:', playerState);
+            
+            if (playerState === YT.PlayerState.READY) {
+              console.log('=== VIDEO READY, STARTING PLAYBACK ===');
+              clearInterval(checkPlayer);
+              player.playVideo();
+            }
+          }, 100);
+
+          // Set a timeout to clear the interval if it takes too long
+          setTimeout(() => {
+            clearInterval(checkPlayer);
+            console.log('Timeout waiting for video to be ready');
+          }, 5000);
+        }
       }
       
+      // Always hide sync button and show controls
       syncPlaybackButton.style.display = 'none';
       controlButtons.style.display = 'flex';
       hasInitialSync = true;
+      console.log('=== SYNC PLAYBACK COMPLETED ===');
     } catch (error) {
-      console.error('Error syncing playback:', error);
+      console.error('=== SYNC PLAYBACK ERROR ===');
+      console.error('Error:', error);
       showNotification('Error syncing playback. Please try again.');
     }
   });
 
   // Refresh button click handler
   refreshButton.addEventListener('click', loadQueue);
-
-  // Name submission handler
-  submitNameButton.addEventListener('click', () => {
-    const name = userNameInput.value.trim();
-    if (name) {
-      userName = name;
-      sessionStorage.setItem('userName', name);
-      nameModal.style.display = 'none';
-      videoContainer.style.display = 'block';
-      syncPlaybackButton.style.display = 'flex';
-      controlButtons.style.display = 'none';
-    }
-  });
 }
 
 // Initialize app after player is ready
 async function initializeApp() {
+  console.log('initializeApp started');
+  console.log('Current userName:', userName);
+  
   // Check for user name
   if (!userName) {
+    console.log('No userName found, showing modal');
     showNameModal();
     return;
   }
 
+  // Show video container immediately
+  videoContainer.style.display = 'block';
+  console.log('Video container shown');
+
+  console.log('Loading configuration...');
   // Load configuration
   await loadConfig();
   
+  console.log('Loading queue and current video...');
   // Load initial queue and current video
   await Promise.all([loadQueue(), loadCurrentVideo()]);
   
+  console.log('Updating displays...');
   // Update displays immediately
   updateCurrentVideoDisplay();
   updateQueueDisplay();
   
+  console.log('Setting up polling intervals...');
   // Start polling for updates
   setInterval(loadQueue, 5000);
   setInterval(loadCurrentVideo, 5000);
   setInterval(processQueueState, 1000);
   
+  console.log('Setting up event listeners...');
   // Set up event listeners
   setupEventListeners();
+  
+  // Show sync button
+  syncPlaybackButton.style.display = 'flex';
+  controlButtons.style.display = 'none';
+  
+  console.log('initializeApp completed');
 }
 
 // Show name modal if no name is set
 function showNameModal() {
+  console.log('showNameModal called');
   nameModal.style.display = 'flex';
+  console.log('Modal display set to flex');
 }
-
-// Load the YouTube Iframe API
-const tag = document.createElement('script');
-tag.src = 'https://www.youtube.com/iframe_api';
-const firstScriptTag = document.getElementsByTagName('script')[0];
-firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
 // Wait for YouTube API to be ready
 window.onYouTubeIframeAPIReady = function() {
+  console.log('YouTube API Ready');
   // Initialize player
   player = new YT.Player('youtube-player', {
     height: '360',
@@ -672,8 +897,8 @@ window.onYouTubeIframeAPIReady = function() {
       'playsinline': 1,
       'enablejsapi': 1,
       'origin': window.location.origin,
-      'autoplay': 1,
-      'controls': 1,
+      'autoplay': 0,  // Changed to 0 to prevent autoplay issues
+      'controls': 1,  // Show controls initially
       'rel': 0,
       'showinfo': 0,
       'modestbranding': 1,
@@ -682,7 +907,9 @@ window.onYouTubeIframeAPIReady = function() {
       'iv_load_policy': 3,
       'enablejsapi': 1,
       'widget_referrer': window.location.href,
-      'mute': 1
+      'mute': 1,
+      'disablekb': 0,  // Enable keyboard controls
+      'vq': 'hd720'  // Request HD quality
     },
     events: {
       'onStateChange': onPlayerStateChange,
@@ -694,16 +921,10 @@ window.onYouTubeIframeAPIReady = function() {
 };
 
 // Start the app when the page loads
-window.onload = initializeApp;
-
-// Show name modal if no name is set
-if (!userName) {
-  nameModal.style.display = 'flex';
-} else {
-  videoContainer.style.display = 'block';
-  syncPlaybackButton.style.display = 'flex';
-  controlButtons.style.display = 'none';
-}
+window.onload = () => {
+  console.log('Window onload triggered');
+  initializeApp();
+};
 
 // Process queue state changes
 async function processQueueState() {
