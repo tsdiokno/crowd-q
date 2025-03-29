@@ -1,5 +1,6 @@
 // Global variables
 let queue = [];
+let currentVideo = null;
 let player = null;
 let userName = sessionStorage.getItem('userName');
 let lastProcessedLogEntry = null;
@@ -10,6 +11,7 @@ let hasInitialSync = false;
 
 // DOM elements
 const queueDisplay = document.getElementById('queue-list');
+const currentVideoDisplay = document.getElementById('current-video');
 const youtubeUrlInput = document.getElementById('youtube-url');
 const addButton = document.getElementById('add-to-queue');
 const refreshButton = document.getElementById('refresh-button');
@@ -52,16 +54,7 @@ async function loadQueue() {
   try {
     const response = await fetch('get_queue.php');
     const data = await response.json();
-    
-    // Check if the current song has changed
-    if (queue.length > 0 && data.length > 0) {
-      const currentSong = queue[0];
-      const newCurrentSong = data[0];
-      
-      if (currentSong.videoId !== newCurrentSong.videoId) {
-        addLogEntry('Song Changed', newCurrentSong.title || newCurrentSong.url);
-      }
-    }
+    console.log('Loaded queue:', data); // Debug log
     
     queue = data;
     updateQueueDisplay();
@@ -70,15 +63,39 @@ async function loadQueue() {
   }
 }
 
+// Load current video from server
+async function loadCurrentVideo() {
+  try {
+    const response = await fetch('get_current_video.php');
+    currentVideo = await response.json();
+    console.log('Loaded current video:', currentVideo); // Debug log
+    updateCurrentVideoDisplay();
+  } catch (error) {
+    console.error('Error loading current video:', error);
+  }
+}
+
 // Save queue to server
-function saveQueue() {
-  fetch('save_queue.php', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ queue: queue })
-  });
+async function saveQueue() {
+  try {
+    const response = await fetch('save_queue.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ queue: queue })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save queue');
+    }
+
+    const data = await response.json();
+    console.log('Queue saved successfully:', data); // Debug log
+  } catch (error) {
+    console.error('Error saving queue:', error);
+    throw error;
+  }
 }
 
 // Helper function to extract VIDEO_ID from a YouTube URL
@@ -190,16 +207,13 @@ function onPlayerStateChange(event) {
 // Add log entry function
 async function addLogEntry(action, details = '', position = null) {
   try {
-    // First check the latest queue state from server
-    const response = await fetch('get_queue.php');
-    const data = await response.json();
+    // Get the current video state
+    const response = await fetch('get_current_video.php');
+    const currentVideoData = await response.json();
     
-    // Skip if this is the same action as the latest queue entry
-    if (data && data.length > 0) {
-      const latestEntry = data[0];
-      if (latestEntry.status && latestEntry.status.action === action) {
-        return;
-      }
+    // Skip if this is the same action as the current video
+    if (currentVideoData && currentVideoData.status && currentVideoData.status.action === action) {
+      return;
     }
 
     // Create timestamp in 12-hour format with consistent options
@@ -211,16 +225,10 @@ async function addLogEntry(action, details = '', position = null) {
       timeZone: 'UTC'
     });
 
-    // Update the first item in the queue with the new status
-    if (data && data.length > 0) {
-      // Ensure the queue item has the correct structure
-      const currentItem = data[0];
-      if (!currentItem.status) {
-        currentItem.status = {};
-      }
-
+    // Update the current video status
+    if (currentVideoData && currentVideoData.videoId) {
       // Update the status with the new action
-      currentItem.status = {
+      currentVideoData.status = {
         action: action,
         user: userName,
         position: position,
@@ -228,194 +236,44 @@ async function addLogEntry(action, details = '', position = null) {
         details: details
       };
 
-      // Use PATCH method to update only the status of the current item
-      const patchResponse = await fetch('update_queue.php', {
-        method: 'PATCH',
+      // Update current video
+      const updateResponse = await fetch('update_current_video.php', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          index: 0,
-          status: currentItem.status
-        })
+        body: JSON.stringify(currentVideoData)
       });
 
-      if (!patchResponse.ok) {
-        throw new Error('Failed to update queue state');
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update current video state');
       }
 
-      // Update local queue
-      queue = data;
-      updateQueueDisplay();
+      // Update local state
+      currentVideo = currentVideoData;
+      updateCurrentVideoDisplay();
 
-      // Process the queue state change immediately
+      // Process the state change immediately
       await processQueueState();
     }
   } catch (error) {
-    console.error('Error updating queue:', error);
+    console.error('Error updating current video:', error);
   }
 }
 
-// Process queue state changes
-async function processQueueState() {
-  try {
-    const response = await fetch('get_queue.php');
-    const data = await response.json();
-    
-    if (data && data.length > 0) {
-      const latestEntry = data[0];
-      const status = latestEntry.status;
-      
-      if (!status) return;
-      
-      // Skip if this is the same action as the last one we processed
-      if (lastProcessedLogEntry && lastProcessedLogEntry.status.action === status.action) {
-        return;
-      }
-      
-      // Update last processed entry
-      lastProcessedLogEntry = latestEntry;
-      
-      // Handle different actions
-      switch (status.action.toLowerCase()) {
-        case 'play':
-          if (player && latestEntry.videoId) {
-            // Validate video ID format
-            if (!/^[a-zA-Z0-9_-]{11}$/.test(latestEntry.videoId)) {
-              console.error('Invalid video ID format:', latestEntry.videoId);
-              return;
-            }
-
-            // Get the current video ID from the player
-            const currentVideoId = player.getVideoData().video_id;
-            
-            // If we're already playing this video, just seek to the position
-            if (currentVideoId === latestEntry.videoId) {
-              player.seekTo(status.position || 0, true);
-              player.playVideo();
-            } else {
-              // If it's a different video, load it with the correct position
-              player.loadVideoById({
-                videoId: latestEntry.videoId,
-                playerVars: {
-                  'autoplay': 1,
-                  'playsinline': 1,
-                  'enablejsapi': 1,
-                  'origin': window.location.origin,
-                  'start': status.position || 0,
-                  'mute': 1,
-                  'rel': 0,
-                  'showinfo': 0,
-                  'modestbranding': 1,
-                  'fs': 1,
-                  'cc_load_policy': 1,
-                  'iv_load_policy': 3
-                }
-              });
-            }
-          }
-          break;
-          
-        case 'pause':
-          if (player) {
-            player.pauseVideo();
-          }
-          break;
-          
-        case 'next':
-          if (data.length > 1) {
-            // Remove the first item and save the updated queue
-            const saveResponse = await fetch('save_queue.php', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(data.slice(1)) // Send the queue without the first item
-            });
-            
-            if (!saveResponse.ok) {
-              throw new Error('Failed to save queue state');
-            }
-            
-            // Update local queue
-            queue = data.slice(1);
-            updateQueueDisplay();
-            
-            // If there's a next video, play it
-            if (queue.length > 0) {
-              // Add a small delay to ensure the queue is updated
-              setTimeout(async () => {
-                // Create a new status for the next video
-                const nextStatus = {
-                  action: 'Play',
-                  user: userName,
-                  position: 0,
-                  timestamp: new Date().toLocaleTimeString('en-US', { 
-                    hour: '2-digit', 
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: true,
-                    timeZone: 'UTC'
-                  }),
-                  details: queue[0].title || queue[0].url
-                };
-
-                // Update the status of the next video
-                const patchResponse = await fetch('update_queue.php', {
-                  method: 'PATCH',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    index: 0,
-                    status: nextStatus
-                  })
-                });
-
-                if (!patchResponse.ok) {
-                  throw new Error('Failed to update next video status');
-                }
-
-                // Process the queue state again to play the next video
-                await processQueueState();
-              }, 100);
-            }
-          }
-          break;
-      }
-    }
-  } catch (error) {
-    console.error('Error processing queue state:', error);
-  }
-}
-
-// Update the queue display
-function updateQueueDisplay() {
-  queueDisplay.innerHTML = '';
-  if (!hasApiKey) {
-    const warningDiv = document.createElement('div');
-    warningDiv.style.cssText = `
-      background-color: var(--md-sys-color-error);
-      color: var(--md-sys-color-on-error);
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      font-size: 0.875rem;
-    `;
-    warningDiv.innerHTML = `
-      <span class="material-icons" style="vertical-align: middle; margin-right: 8px;">warning</span>
-      YouTube API key not configured. Video titles will not be displayed. To enable titles, replace the API key in the code.
-    `;
-    queueDisplay.appendChild(warningDiv);
-  }
-  queue.forEach((item, index) => {
+// Update current video display
+function updateCurrentVideoDisplay() {
+  currentVideoDisplay.innerHTML = '';
+  console.log('Updating current video display with:', currentVideo); // Debug log
+  
+  if (currentVideo && currentVideo.videoId) {
     const div = document.createElement('div');
-    div.classList.add('queue-item');
+    div.classList.add('queue-item', 'current-playing');
     
     // Format the status information if it exists
     let statusHtml = '';
-    if (item.status) {
-      const status = item.status;
+    if (currentVideo.status) {
+      const status = currentVideo.status;
       const position = status.position ? Math.floor(status.position) : 0;
       const minutes = Math.floor(position / 60);
       const seconds = position % 60;
@@ -435,15 +293,75 @@ function updateQueueDisplay() {
     }
     
     div.innerHTML = `
+      <img class="queue-item-thumbnail" src="https://img.youtube.com/vi/${currentVideo.videoId}/3.jpg" alt="Thumbnail">
+      <div class="queue-item-info">
+        <div class="queue-position">Currently Playing</div>
+        ${currentVideo.title ? `<div class="video-title">${currentVideo.title}</div>` : ''}
+        <a href="${currentVideo.url}" target="_blank" rel="noopener noreferrer">${currentVideo.url} <span class="material-icons">open_in_new</span></a>
+        ${statusHtml}
+      </div>
+    `;
+    currentVideoDisplay.appendChild(div);
+  } else {
+    // Show empty state
+    currentVideoDisplay.innerHTML = `
+      <div class="queue-item empty-state">
+        <div class="queue-item-info">
+          <div class="queue-position">No video playing</div>
+          <div class="video-title">Add a video to start playing</div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+// Update the queue display (now only shows upcoming videos)
+function updateQueueDisplay() {
+  queueDisplay.innerHTML = '';
+  console.log('Updating queue display with:', queue); // Debug log
+  
+  if (!hasApiKey) {
+    const warningDiv = document.createElement('div');
+    warningDiv.style.cssText = `
+      background-color: var(--md-sys-color-error);
+      color: var(--md-sys-color-on-error);
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 0.875rem;
+    `;
+    warningDiv.innerHTML = `
+      <span class="material-icons" style="vertical-align: middle; margin-right: 8px;">warning</span>
+      YouTube API key not configured. Video titles will not be displayed. To enable titles, replace the API key in the code.
+    `;
+    queueDisplay.appendChild(warningDiv);
+  }
+  
+  if (queue.length === 0) {
+    // Show empty state
+    queueDisplay.innerHTML = `
+      <div class="queue-item empty-state">
+        <div class="queue-item-info">
+          <div class="queue-position">Queue is empty</div>
+          <div class="video-title">Add videos to the queue</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  
+  queue.forEach((item, index) => {
+    const div = document.createElement('div');
+    div.classList.add('queue-item');
+    
+    div.innerHTML = `
       <img class="queue-item-thumbnail" src="https://img.youtube.com/vi/${item.videoId}/3.jpg" alt="Thumbnail">
       <div class="queue-item-info">
         <div class="queue-position">Queue Position: ${index + 1}</div>
         ${item.title ? `<div class="video-title">${item.title}</div>` : ''}
         <a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.url} <span class="material-icons">open_in_new</span></a>
-        ${statusHtml}
       </div>
     `;
-    if (index === 0) div.classList.add('current-playing');
     queueDisplay.appendChild(div);
   });
 }
@@ -470,9 +388,14 @@ function getStatusIcon(action) {
 function setupEventListeners() {
   // Add button click handler
   addButton.addEventListener('click', async () => {
+    console.log('Add button clicked');
     const url = youtubeUrlInput.value.trim();
     const videoId = extractVideoId(url);
+    console.log('Extracted video ID:', videoId);
+    
     if (videoId && !queue.some(item => item.url === url)) {
+      console.log('Video ID is valid and not in queue');
+      
       // Check if video allows embedding using a more reliable method
       const embedUrl = `https://www.youtube.com/embed/${videoId}`;
       const iframe = document.createElement('iframe');
@@ -482,16 +405,19 @@ function setupEventListeners() {
       // Create a promise to check if the video loads
       const embedCheck = new Promise((resolve) => {
         iframe.onload = () => {
-          // If we can load the iframe, the video is embeddable
+          console.log('Embed check passed');
           resolve(true);
         };
         iframe.onerror = () => {
-          // If there's an error loading the iframe, the video might not be embeddable
+          console.log('Embed check failed');
           resolve(false);
         };
         
         // Set a timeout to resolve as true if we can't determine otherwise
-        setTimeout(() => resolve(true), 2000);
+        setTimeout(() => {
+          console.log('Embed check timed out');
+          resolve(true);
+        }, 2000);
       });
       
       // Add iframe to document temporarily
@@ -509,8 +435,9 @@ function setupEventListeners() {
       // Get title from cache or fetch if needed
       const titles = await fetchVideoTitles([videoId]);
       const title = titles.get(videoId) || null;
+      console.log('Got video title:', title);
       
-      // Create new queue item with proper structure
+      // Create new video item with proper structure
       const newItem = {
         url: url,
         title: title,
@@ -528,61 +455,53 @@ function setupEventListeners() {
           details: title || url
         }
       };
+      console.log('Created new item:', newItem);
+
+      // Check if there's a current video
+      const currentVideoResponse = await fetch('get_current_video.php');
+      const currentVideoData = await currentVideoResponse.json();
+      console.log('Current video data:', currentVideoData);
       
-      queue.push(newItem);
-      saveQueue();
-      updateQueueDisplay();
-      youtubeUrlInput.value = '';
-    } else {
-      alert('Invalid YouTube URL or already in queue');
-    }
-  });
+      if (!currentVideoData.videoId) {
+        console.log('No current video, making this the current video');
+        // If no current video, make this the current video
+        const currentVideoUpdate = {
+          ...newItem,
+          status: {
+            ...newItem.status,
+            action: 'Play',
+            position: 0
+          }
+        };
 
-  // Play button click handler - only updates queue state
-  document.getElementById('play-button').addEventListener('click', async () => {
-    if (queue.length > 0) {
-      const currentPosition = player ? player.getCurrentTime() : 0;
-      addLogEntry('Play', queue[0].title, currentPosition);
-    }
-  });
+        // Update current video
+        const updateCurrentResponse = await fetch('update_current_video.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(currentVideoUpdate)
+        });
 
-  // Pause button click handler - only updates queue state
-  document.getElementById('pause-button').addEventListener('click', () => {
-    if (player) {
-      const currentPosition = player.getCurrentTime();
-      addLogEntry('Pause', '', currentPosition);
-    }
-  });
+        if (!updateCurrentResponse.ok) {
+          throw new Error('Failed to update current video');
+        }
 
-  // Next button click handler - only updates queue state
-  document.getElementById('next-button').addEventListener('click', () => {
-    if (queue.length > 1) {
-      addLogEntry('Next', queue[0].title);
-    }
-  });
+        // Update local state
+        currentVideo = currentVideoUpdate;
+        updateCurrentVideoDisplay();
 
-  // Sync playback button click handler
-  syncPlaybackButton.addEventListener('click', async () => {
-    try {
-      const response = await fetch('get_queue.php');
-      const data = await response.json();
-      
-      if (data && data.length > 0) {
-        const latestEntry = data[0];
-        
-        if (latestEntry.videoId && player) {
-          // Add log entry for sync
-          addLogEntry('Play', latestEntry.title, latestEntry.status?.position || 0);
-          
-          // Load and play video
+        // If player is ready, start playing
+        if (player) {
+          console.log('Loading video in player');
           player.loadVideoById({
-            videoId: latestEntry.videoId,
+            videoId: videoId,
             playerVars: {
               'autoplay': 1,
               'playsinline': 1,
               'enablejsapi': 1,
               'origin': window.location.origin,
-              'start': latestEntry.status?.position || 0,
+              'start': 0,
               'mute': 1,
               'rel': 0,
               'showinfo': 0,
@@ -593,11 +512,95 @@ function setupEventListeners() {
             }
           });
         }
+      } else {
+        console.log('Current video exists, adding to queue');
+        // If there is a current video, add to queue
+        queue.push(newItem);
+        console.log('Updated queue:', queue);
         
-        syncPlaybackButton.style.display = 'none';
-        controlButtons.style.display = 'flex';
-        hasInitialSync = true;
+        // Save queue to server
+        const saveResponse = await fetch('save_queue.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ queue: queue })
+        });
+
+        if (!saveResponse.ok) {
+          throw new Error('Failed to save queue');
+        }
+
+        const saveResult = await saveResponse.json();
+        console.log('Save queue response:', saveResult);
+
+        // Update local state and display
+        updateQueueDisplay();
       }
+
+      youtubeUrlInput.value = '';
+    } else {
+      console.log('Invalid video ID or already in queue');
+      alert('Invalid YouTube URL or already in queue');
+    }
+  });
+
+  // Play button click handler - updates current video state
+  document.getElementById('play-button').addEventListener('click', async () => {
+    if (currentVideo && currentVideo.videoId) {
+      const currentPosition = player ? player.getCurrentTime() : 0;
+      addLogEntry('Play', currentVideo.title, currentPosition);
+    }
+  });
+
+  // Pause button click handler - updates current video state
+  document.getElementById('pause-button').addEventListener('click', () => {
+    if (currentVideo && currentVideo.videoId && player) {
+      const currentPosition = player.getCurrentTime();
+      addLogEntry('Pause', '', currentPosition);
+    }
+  });
+
+  // Next button click handler - updates current video state
+  document.getElementById('next-button').addEventListener('click', () => {
+    if (currentVideo && currentVideo.videoId) {
+      addLogEntry('Next', currentVideo.title);
+    }
+  });
+
+  // Sync playback button click handler
+  syncPlaybackButton.addEventListener('click', async () => {
+    try {
+      const response = await fetch('get_current_video.php');
+      const currentVideoData = await response.json();
+      
+      if (currentVideoData && currentVideoData.videoId && player) {
+        // Add log entry for sync
+        addLogEntry('Play', currentVideoData.title, currentVideoData.status?.position || 0);
+        
+        // Load and play video
+        player.loadVideoById({
+          videoId: currentVideoData.videoId,
+          playerVars: {
+            'autoplay': 1,
+            'playsinline': 1,
+            'enablejsapi': 1,
+            'origin': window.location.origin,
+            'start': currentVideoData.status?.position || 0,
+            'mute': 1,
+            'rel': 0,
+            'showinfo': 0,
+            'modestbranding': 1,
+            'fs': 1,
+            'cc_load_policy': 1,
+            'iv_load_policy': 3
+          }
+        });
+      }
+      
+      syncPlaybackButton.style.display = 'none';
+      controlButtons.style.display = 'flex';
+      hasInitialSync = true;
     } catch (error) {
       console.error('Error syncing playback:', error);
       showNotification('Error syncing playback. Please try again.');
@@ -632,12 +635,16 @@ async function initializeApp() {
   // Load configuration
   await loadConfig();
   
-  // Load initial queue
-  await loadQueue();
+  // Load initial queue and current video
+  await Promise.all([loadQueue(), loadCurrentVideo()]);
   
-  // Start polling for queue updates
+  // Update displays immediately
+  updateCurrentVideoDisplay();
+  updateQueueDisplay();
+  
+  // Start polling for updates
   setInterval(loadQueue, 5000);
-  // Start polling for queue state changes
+  setInterval(loadCurrentVideo, 5000);
   setInterval(processQueueState, 1000);
   
   // Set up event listeners
@@ -696,4 +703,135 @@ if (!userName) {
   videoContainer.style.display = 'block';
   syncPlaybackButton.style.display = 'flex';
   controlButtons.style.display = 'none';
+}
+
+// Process queue state changes
+async function processQueueState() {
+  try {
+    // Get the current video state from server
+    const response = await fetch('get_current_video.php');
+    const currentVideoData = await response.json();
+    
+    if (!currentVideoData || !currentVideoData.videoId) {
+      return;
+    }
+
+    // Validate video ID format
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(currentVideoData.videoId)) {
+      console.error('Invalid video ID format:', currentVideoData.videoId);
+      return;
+    }
+
+    // Check if this is a new action we haven't processed yet
+    if (currentVideoData.status && 
+        (!lastProcessedLogEntry || 
+         currentVideoData.status.timestamp !== lastProcessedLogEntry.timestamp ||
+         currentVideoData.status.action !== lastProcessedLogEntry.action)) {
+      
+      console.log('Processing new video state:', currentVideoData.status);
+      
+      // Update last processed entry
+      lastProcessedLogEntry = currentVideoData.status;
+      
+      // Handle different actions
+      switch (currentVideoData.status.action) {
+        case 'Play':
+          if (player && player.getVideoData().video_id !== currentVideoData.videoId) {
+            console.log('Loading video:', currentVideoData.videoId);
+            player.loadVideoById({
+              videoId: currentVideoData.videoId,
+              playerVars: {
+                'autoplay': 1,
+                'playsinline': 1,
+                'enablejsapi': 1,
+                'origin': window.location.origin,
+                'start': currentVideoData.status.position || 0,
+                'mute': 1,
+                'rel': 0,
+                'showinfo': 0,
+                'modestbranding': 1,
+                'fs': 1,
+                'cc_load_policy': 1,
+                'iv_load_policy': 3
+              }
+            });
+          } else if (player) {
+            console.log('Playing video at position:', currentVideoData.status.position);
+            player.playVideo();
+            player.seekTo(currentVideoData.status.position || 0, true);
+          }
+          break;
+          
+        case 'Pause':
+          if (player) {
+            console.log('Pausing video at position:', currentVideoData.status.position);
+            player.pauseVideo();
+            if (currentVideoData.status.position !== undefined) {
+              player.seekTo(currentVideoData.status.position, true);
+            }
+          }
+          break;
+          
+        case 'Next':
+          if (player) {
+            console.log('Moving to next video');
+            // Get the queue to find the next video
+            const queueResponse = await fetch('get_queue.php');
+            const queueData = await queueResponse.json();
+            
+            if (queueData && queueData.length > 0) {
+              // Get the first video from the queue
+              const nextVideo = queueData[0];
+              
+              // Update current video with the next video
+              const updateResponse = await fetch('update_current_video.php', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  ...nextVideo,
+                  status: {
+                    action: 'Play',
+                    user: userName,
+                    position: 0,
+                    timestamp: new Date().toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: true,
+                      timeZone: 'UTC'
+                    }),
+                    details: nextVideo.title || nextVideo.url
+                  }
+                })
+              });
+
+              if (!updateResponse.ok) {
+                throw new Error('Failed to update current video');
+              }
+
+              // Remove the video from the queue
+              queueData.shift();
+              await fetch('save_queue.php', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ queue: queueData })
+              });
+
+              // Update local state
+              queue = queueData;
+              currentVideo = nextVideo;
+              updateQueueDisplay();
+              updateCurrentVideoDisplay();
+            }
+          }
+          break;
+      }
+    }
+  } catch (error) {
+    console.error('Error processing video state:', error);
+  }
 }
