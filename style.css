@@ -94,24 +94,67 @@
     margin-bottom: 32px;
   }
 
-  h2 {
-    color: var(--md-sys-color-primary);
-    margin-bottom: 16px;
+  /* Currently Playing Container */
+  .currently-playing-container {
+    background-color: var(--md-sys-color-surface);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
   }
 
+  .currently-playing-container .queue-item {
+    border: 3px solid var(--md-sys-color-primary);
+    background: var(--md-sys-color-surface);
+    box-shadow: 0 4px 12px rgba(255, 138, 0, 0.2);
+  }
+
+  .currently-playing-container h2 {
+    color: var(--md-sys-color-primary);
+    margin-bottom: 16px;
+    font-size: 1.25rem;
+  }
+
+  /* Playing Next Container */
+  .playing-next-container {
+    background-color: var(--md-sys-color-surface);
+    border-radius: 12px;
+    padding: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .playing-next-container h2 {
+    color: var(--md-sys-color-primary);
+    margin-bottom: 16px;
+    font-size: 1.25rem;
+    position: sticky;
+    top: 0;
+    background-color: var(--md-sys-color-surface);
+    padding-bottom: 8px;
+    z-index: 1;
+  }
+
+  /* Queue Item Styling */
   .queue-item {
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 16px;
-    background-color: var(--md-sys-color-surface);
-    border-radius: 12px;
-    margin-bottom: 12px;
-    transition: transform 0.2s;
+    background-color: var(--md-sys-color-surface-container);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
   }
 
   .queue-item:hover {
     transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .queue-item.playing {
+    border: none;
+    background: var(--md-sys-color-surface);
+    box-shadow: none;
   }
 
   .queue-item-thumbnail {
@@ -160,8 +203,64 @@
     vertical-align: middle;
   }
 
-  .current-playing {
-    border: 2px solid var(--md-sys-color-primary);
+  .queue-item .title {
+    font-weight: 600;
+    color: var(--md-sys-color-on-surface);
+    margin-bottom: 4px;
+  }
+
+  .queue-item .artist {
+    color: var(--md-sys-color-on-surface);
+    opacity: 0.7;
+    font-size: 0.9em;
+  }
+
+  .queue-item .duration {
+    color: var(--md-sys-color-on-surface);
+    opacity: 0.5;
+    font-size: 0.8em;
+  }
+
+  .queue-item .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .queue-item .actions button {
+    background: none;
+    border: none;
+    color: var(--md-sys-color-on-surface);
+    opacity: 0.7;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .queue-item .actions button:hover {
+    background: var(--md-sys-color-surface-container);
+    opacity: 1;
+  }
+
+  /* Scrollbar Styling for Playing Next Container */
+  .playing-next-container::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .playing-next-container::-webkit-scrollbar-track {
+    background: var(--md-sys-color-surface);
+    border-radius: 4px;
+  }
+
+  .playing-next-container::-webkit-scrollbar-thumb {
+    background: var(--md-sys-color-primary);
+    border-radius: 4px;
+    opacity: 0.5;
+  }
+
+  .playing-next-container::-webkit-scrollbar-thumb:hover {
+    opacity: 0.7;
   }
 
   .control-buttons {

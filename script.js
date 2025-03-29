@@ -268,7 +268,7 @@ function updateCurrentVideoDisplay() {
   
   if (currentVideo && currentVideo.videoId) {
     const div = document.createElement('div');
-    div.classList.add('queue-item', 'current-playing');
+    div.classList.add('queue-item');
     
     // Format the status information if it exists
     let statusHtml = '';
