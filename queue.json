@@ -1,1 +1,40 @@
-[]
+[
+    {
+        "videoId": null,
+        "title": "Loading next video...",
+        "status": {
+            "action": "Next",
+            "user": "Jack",
+            "position": 0,
+            "timestamp": "2025-03-30T06:33:24.454Z",
+            "details": "Next: Multo (Live at The Cozy Cove) - Cup of Joe"
+        }
+    },
+    {
+        "videoId": "B33a8YkS-hU",
+        "title": "Multo (Live at The Cozy Cove) - Cup of Joe",
+        "thumbnail": "https:\/\/i.ytimg.com\/vi\/B33a8YkS-hU\/default.jpg",
+        "url": "https:\/\/www.youtube.com\/watch?v=B33a8YkS-hU",
+        "addedBy": "Jack",
+        "timestamp": "2025-03-30T06:33:24.454Z"
+    },
+    {
+        "videoId": null,
+        "title": "Loading next video...",
+        "status": {
+            "action": "Next",
+            "user": "Jack",
+            "position": 0,
+            "timestamp": "2025-03-30T06:33:35.949Z",
+            "details": "Next: Tadhana + Oo - Up Dharma Down (Live Cover)"
+        }
+    },
+    {
+        "videoId": "0G0SAEpt7bI",
+        "title": "Tadhana + Oo - Up Dharma Down (Live Cover)",
+        "thumbnail": "https:\/\/i.ytimg.com\/vi\/0G0SAEpt7bI\/default.jpg",
+        "url": "https:\/\/www.youtube.com\/watch?v=0G0SAEpt7bI",
+        "addedBy": "Jack",
+        "timestamp": "2025-03-30T06:33:35.949Z"
+    }
+]
