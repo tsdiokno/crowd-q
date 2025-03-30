@@ -310,6 +310,38 @@ function onPlayerStateChange(event) {
   // Update queue display to show current state
   updateQueueDisplay();
 
+  // If video just started playing and position is 0, update the timestamp
+  if (event.data === YT.PlayerState.PLAYING && currentVideo && 
+      currentVideo.status.position === 0 && 
+      currentVideo.status.action !== 'Play') {
+    console.log('Video started playing for the first time, updating timestamp');
+    const currentVideoUpdate = {
+      ...currentVideo,
+      status: {
+        ...currentVideo.status,
+        action: 'Play',
+        position: 0,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    // Update current video on server
+    fetch('update_current_video.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(currentVideoUpdate)
+    }).then(response => {
+      if (response.ok) {
+        currentVideo = currentVideoUpdate;
+        updateCurrentVideoDisplay();
+      }
+    }).catch(error => {
+      console.error('Error updating video timestamp:', error);
+    });
+  }
+
   if (event.data === YT.PlayerState.ENDED) {
     nextSong();
   }
@@ -574,13 +606,7 @@ function setupEventListeners() {
         status: {
           action: 'Add',
           user: userName,
-          timestamp: new Date().toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: true,
-            timeZone: 'UTC'
-          }),
+          timestamp: new Date().toISOString(),
           details: title || url
         }
       };
@@ -597,9 +623,11 @@ function setupEventListeners() {
         const currentVideoUpdate = {
           ...newItem,
           status: {
-            ...newItem.status,
             action: 'Play',
-            position: 0
+            user: userName,
+            position: 0,
+            timestamp: new Date().toISOString(), // This will be updated when video actually starts playing
+            details: title || url
           }
         };
 
