@@ -418,64 +418,7 @@ function updateCurrentVideoDisplay() {
   currentVideoDisplay.innerHTML = '';
   console.log('Updating current video display with:', currentVideo);
   
-  // Check if this is a Next placeholder (dummy object)
-  if (currentVideo && currentVideo.videoId === null && currentVideo.status?.action === 'Next') {
-    // Show "Playing next video" state for dummy Next object
-    const div = document.createElement('div');
-    div.classList.add('queue-item');
-    div.innerHTML = `
-      <div class="queue-item-info">
-        <div class="queue-position">Currently Playing</div>
-        <div class="video-title">Playing next video...</div>
-        <div class="queue-status">
-          <span class="status-action next">
-            <span class="material-icons">skip_next</span>
-            Next
-          </span>
-          <span class="status-user">by ${currentVideo.status.user}</span>
-          <span class="status-timestamp">${currentVideo.status.timestamp}</span>
-        </div>
-      </div>
-    `;
-    currentVideoDisplay.appendChild(div);
-  } else if (currentVideo && currentVideo.videoId) {
-    // Show normal video display for actual videos
-    const div = document.createElement('div');
-    div.classList.add('queue-item');
-    
-    // Format the status information if it exists
-    let statusHtml = '';
-    if (currentVideo.status) {
-      const status = currentVideo.status;
-      const position = status.position ? Math.floor(status.position) : 0;
-      const minutes = Math.floor(position / 60);
-      const seconds = position % 60;
-      const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      
-      statusHtml = `
-        <div class="queue-status">
-          <span class="status-action ${status.action.toLowerCase()}">
-            <span class="material-icons">${getStatusIcon(status.action)}</span>
-            ${status.action}
-          </span>
-          <span class="status-time">at ${timeString}</span>
-          <span class="status-user">by ${status.user}</span>
-          <span class="status-timestamp">${status.timestamp}</span>
-        </div>
-      `;
-    }
-    
-    div.innerHTML = `
-      <img class="queue-item-thumbnail" src="https://img.youtube.com/vi/${currentVideo.videoId}/3.jpg" alt="Thumbnail">
-      <div class="queue-item-info">
-        <div class="queue-position">Currently Playing</div>
-        ${currentVideo.title ? `<div class="video-title">${currentVideo.title}</div>` : ''}
-        <a href="${currentVideo.url}" target="_blank" rel="noopener noreferrer">${currentVideo.url} <span class="material-icons">open_in_new</span></a>
-        ${statusHtml}
-      </div>
-    `;
-    currentVideoDisplay.appendChild(div);
-  } else {
+  if (!currentVideo) {
     // Show empty state
     currentVideoDisplay.innerHTML = `
       <div class="queue-item empty-state">
@@ -485,7 +428,67 @@ function updateCurrentVideoDisplay() {
         </div>
       </div>
     `;
+    return;
   }
+
+  // Check if this is a Next placeholder (dummy object)
+  if (currentVideo.videoId === null) {
+    console.log('Displaying Next placeholder state');
+    const div = document.createElement('div');
+    div.classList.add('queue-item');
+    div.innerHTML = `
+      <div class="queue-item-info">
+        <div class="queue-position">Currently Playing</div>
+        <div class="video-title">Playing next item...</div>
+        <div class="queue-status">
+          <span class="status-action next">
+            <span class="material-icons">skip_next</span>
+            Next
+          </span>
+          ${currentVideo.status ? `<span class="status-user">by ${currentVideo.status.user}</span>` : ''}
+        </div>
+      </div>
+    `;
+    currentVideoDisplay.appendChild(div);
+    return;
+  }
+
+  // Regular video display
+  const div = document.createElement('div');
+  div.classList.add('queue-item');
+  
+  // Format the status information if it exists
+  let statusHtml = '';
+  if (currentVideo.status) {
+    const status = currentVideo.status;
+    const position = status.position ? Math.floor(status.position) : 0;
+    const minutes = Math.floor(position / 60);
+    const seconds = position % 60;
+    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    statusHtml = `
+      <div class="queue-status">
+        <span class="status-action ${status.action.toLowerCase()}">
+          <span class="material-icons">${getStatusIcon(status.action)}</span>
+          ${status.action}
+        </span>
+        <span class="status-time">at ${timeString}</span>
+        <span class="status-user">by ${status.user}</span>
+        <span class="status-timestamp">${status.timestamp}</span>
+      </div>
+    `;
+  }
+  
+  div.innerHTML = `
+    <img class="queue-item-thumbnail" src="https://img.youtube.com/vi/${currentVideo.videoId}/3.jpg" alt="Thumbnail">
+    <div class="queue-item-info">
+      <div class="queue-position">Currently Playing</div>
+      ${currentVideo.title ? `<div class="video-title">${currentVideo.title}</div>` : ''}
+      <a href="${currentVideo.url}" target="_blank" rel="noopener noreferrer">${currentVideo.url} <span class="material-icons">open_in_new</span></a>
+      ${statusHtml}
+    </div>
+  `;
+  currentVideoDisplay.appendChild(div);
 }
 
 // Update the queue display (now only shows upcoming videos)
