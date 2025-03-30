@@ -343,7 +343,10 @@ function onPlayerStateChange(event) {
   }
 
   if (event.data === YT.PlayerState.ENDED) {
-    nextSong();
+    // Call addLogEntry with 'Next' action when video ends
+    if (currentVideo && currentVideo.videoId) {
+      addLogEntry('Next', currentVideo.title);
+    }
   }
 }
 
