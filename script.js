@@ -205,7 +205,7 @@ async function onPlayerReady(event) {
       }
 
       // Load the video immediately
-      player.loadVideoById({
+      player.cueVideoById({
         videoId: currentVideoData.videoId,
         playerVars: {
           'autoplay': 0,
@@ -228,10 +228,10 @@ async function onPlayerReady(event) {
         }
       });
 
-      // Hide sync button and show controls since we're already synced
-      syncPlaybackButton.style.display = 'none';
-      controlButtons.style.display = 'flex';
-      hasInitialSync = true;
+      // Show sync button and hide controls initially
+      syncPlaybackButton.style.display = 'flex';
+      controlButtons.style.display = 'none';
+      hasInitialSync = false;  // Reset initial sync flag
     } else {
       // Show sync button if no current video
       syncPlaybackButton.style.display = 'flex';
@@ -655,10 +655,10 @@ function setupEventListeners() {
         // If player is ready, start playing
         if (player) {
           console.log('Loading video in player');
-          player.loadVideoById({
+          player.cueVideoById({
             videoId: videoId,
             playerVars: {
-              'autoplay': 1,
+              'autoplay': 0,
               'playsinline': 1,
               'enablejsapi': 1,
               'origin': window.location.origin,
@@ -989,26 +989,20 @@ async function processQueueState() {
       // Handle different actions
       switch (currentVideoData.status.action) {
         case 'Play':
+          if (!hasInitialSync) {
+            // If we haven't done initial sync, don't process any play actions
+            return;
+          }
+          
           if (player && player.getVideoData().video_id !== currentVideoData.videoId) {
             console.log('Loading video:', currentVideoData.videoId);
             player.loadVideoById({
               videoId: currentVideoData.videoId,
-              playerVars: {
-                'autoplay': 1,
-                'playsinline': 1,
-                'enablejsapi': 1,
-                'origin': window.location.origin,
-                'start': currentVideoData.status.position || 0,
-                'mute': 1,
-                'rel': 0,
-                'showinfo': 0,
-                'modestbranding': 1,
-                'fs': 1,
-                'cc_load_policy': 1,
-                'iv_load_policy': 3
-              }
+              startSeconds: currentVideoData.status.position || 0,
+              suggestedQuality: 'hd720'
             });
           } else if (player) {
+            // If it's the same video and we have a play action from the server, play it
             console.log('Playing video at position:', currentVideoData.status.position);
             player.playVideo();
             player.seekTo(currentVideoData.status.position || 0, true);
@@ -1048,7 +1042,7 @@ async function processQueueState() {
                     action: 'Play',
                     user: userName,
                     position: 0,
-                    timestamp: new Date().toISOString(), // Changed to set new timestamp when becoming current video
+                    timestamp: new Date().toISOString(),
                     details: nextVideo.title || nextVideo.url
                   }
                 })
@@ -1073,6 +1067,26 @@ async function processQueueState() {
               currentVideo = nextVideo;
               updateQueueDisplay();
               updateCurrentVideoDisplay();
+
+              // Load and play the video if we've done initial sync
+              if (hasInitialSync) {
+                console.log('Loading and playing next video');
+                // First load the video
+                player.loadVideoById({
+                  videoId: nextVideo.videoId,
+                  startSeconds: 0,
+                  suggestedQuality: 'hd720'
+                });
+
+                // Then trigger a new state update to ensure all clients play
+                await addLogEntry('Play', nextVideo.title, 0);
+              } else {
+                player.cueVideoById({
+                  videoId: nextVideo.videoId,
+                  startSeconds: 0,
+                  suggestedQuality: 'hd720'
+                });
+              }
             }
           }
           break;
