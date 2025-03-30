@@ -607,8 +607,9 @@ function setupEventListeners() {
         title: title,
         videoId: videoId,
         status: {
-          action: 'Add',
+          action: 'Play',
           user: userName,
+          position: 0,
           timestamp: new Date().toISOString(),
           details: title || url
         }
@@ -1047,13 +1048,7 @@ async function processQueueState() {
                     action: 'Play',
                     user: userName,
                     position: 0,
-                    timestamp: new Date().toLocaleTimeString('en-US', { 
-                      hour: '2-digit', 
-                      minute: '2-digit',
-                      second: '2-digit',
-                      hour12: true,
-                      timeZone: 'UTC'
-                    }),
+                    timestamp: new Date().toISOString(), // Changed to set new timestamp when becoming current video
                     details: nextVideo.title || nextVideo.url
                   }
                 })
