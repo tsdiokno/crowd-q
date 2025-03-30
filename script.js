@@ -853,34 +853,11 @@ function setupEventListeners() {
       // Set hasInitialSync to true
       hasInitialSync = true;
       
-      // Get current video state
-      const response = await fetch('get_current_video.php');
-      const currentVideoData = await response.json();
+      // Force processQueueState to run by clearing lastProcessedJson
+      lastProcessedJson = null;
       
-      console.log('Current video data:', currentVideoData);
-
-      // If we have a video ID, load it
-      if (currentVideoData && currentVideoData.videoId) {
-        const status = currentVideoData.status;
-        const position = status?.position || 0;
-        
-        console.log('Loading video:', currentVideoData.videoId, 'at position:', position);
-        
-        // Load video and seek to position
-        if (status?.action === 'Play') {
-          player.loadVideoById({
-            videoId: currentVideoData.videoId,
-            startSeconds: position,
-            suggestedQuality: 'hd720'
-          });
-        } else {
-          player.cueVideoById({
-            videoId: currentVideoData.videoId,
-            startSeconds: position,
-            suggestedQuality: 'hd720'
-          });
-        }
-      }
+      // Process the current state immediately
+      await processQueueState();
       
       // Update UI
       syncPlaybackButton.style.display = 'none';
@@ -901,21 +878,10 @@ async function initializeApp() {
   // Load configuration
   await loadConfig();
   
-  // Load initial queue and current video
-  const [queueResponse, currentVideoResponse] = await Promise.all([
-    fetch('get_queue.php'),
-    fetch('get_current_video.php')
-  ]);
-
-  // Update displays immediately
-  await Promise.all([loadQueue(), loadCurrentVideo()]);
-  updateCurrentVideoDisplay();
-  updateQueueDisplay();
-  
-  // Start ALL polling
+  // Start ALL polling immediately
   setInterval(loadQueue, 5000);
   setInterval(loadCurrentVideo, 5000);
-  setInterval(processQueueState, 1000);
+  setInterval(processQueueState, 1000);  // This will check JSON state but won't control video until hasInitialSync is true
   
   // Set up event listeners
   setupEventListeners();
@@ -993,7 +959,13 @@ async function processQueueState() {
     // Convert to string for comparison
     const currentJson = JSON.stringify(currentVideoData);
     
-    // If nothing has changed in the JSON, don't process
+    // Always update control buttons visibility based on current JSON state
+    if (currentVideoData && currentVideoData.status) {
+      console.log('Updating control buttons for action:', currentVideoData.status.action);
+      updateControlButtonsVisibility(currentVideoData.status.action);
+    }
+    
+    // If nothing has changed in the JSON, don't process further
     if (currentJson === lastProcessedJson) {
       return;
     }
@@ -1102,10 +1074,16 @@ async function processQueueState() {
 // Add this function to update control buttons visibility
 function updateControlButtonsVisibility(action) {
   console.log('Updating control buttons for action:', action);
+  
+  // Always show both buttons initially
+  playButton.style.display = 'flex';
+  pauseButton.style.display = 'flex';
+  
+  // Then hide the appropriate button based on action
   if (action === 'Play') {
     playButton.style.display = 'none';
     pauseButton.style.display = 'flex';
-  } else {
+  } else if (action === 'Pause') {
     playButton.style.display = 'flex';
     pauseButton.style.display = 'none';
   }
