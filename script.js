@@ -23,6 +23,7 @@ const syncPlaybackButton = document.getElementById('sync-playback-button');
 const playButton = document.getElementById('play-button');
 const pauseButton = document.getElementById('pause-button');
 const nextButton = document.getElementById('next-button');
+const syncDisplayWrapper = document.getElementById('sync-display-wrapper');
 
 // Show notification function
 function showNotification(message) {
@@ -208,26 +209,23 @@ async function onPlayerReady(event) {
     }
 
     if (currentVideoData && currentVideoData.videoId) {
-      // Just load the video without playing
-      // player.cueVideoById({
-      //   videoId: currentVideoData.videoId,
-      //   startSeconds: playerReadyPosition,
-      //   suggestedQuality: 'hd720'
-      // });
 
       // Show sync button and hide controls initially
       syncPlaybackButton.style.display = 'flex';
-      controlButtons.style.display = 'none';
+
+      //controlButtons.style.display = 'none';
+
       hasInitialSync = false;
 
       // Hide both play and pause buttons initially
-      playButton.style.display = 'none';
-      pauseButton.style.display = 'none';
+
+      syncDisplayWrapper.style.display = 'none';
+
     }
   } catch (error) {
     console.error('Error loading current video on player ready:', error);
     syncPlaybackButton.style.display = 'flex';
-    controlButtons.style.display = 'none';
+    syncDisplayWrapper.style.display = 'none';
   }
 }
 
@@ -293,9 +291,6 @@ function onPlayerStateChange(event) {
     window.playerState.currentVideoId = player.getVideoData().video_id;
   }
 
-  // Update queue display to show current state
-  //updateQueueDisplay();
-
   // If video just started playing and position is 0, update the timestamp
   if (event.data === YT.PlayerState.PLAYING && currentVideo && 
       currentVideo.status.position === 0 && 
@@ -342,7 +337,6 @@ async function addLogEntry(action, details = '', position = null) {
 
   try {
 
-
     // Get the current video state
 
     const response = await fetch('get_current_video.php');
@@ -387,10 +381,6 @@ async function addLogEntry(action, details = '', position = null) {
       currentVideo = currentVideoData;
 
       updateCurrentVideoDisplay();
-
-      // Process the state change immediately
-      // NOPE! Just let the automatic polling do it always
-      // await processQueueState(); 
 
     }
   } catch (error) {
@@ -766,7 +756,7 @@ function setupEventListeners() {
 
       const lastUpdateTime = new Date(currentVideoData.status.timestamp);
       const syncClickTime = new Date();
-      const elapsedSeconds = Math.abs((syncClickTime - lastUpdateTime) / 1000);
+      const elapsedSeconds = Math.floor((syncClickTime - lastUpdateTime) / 1000);
       const startPosition = parseFloat(currentVideoData.status.position);
       const currentPosition = startPosition + elapsedSeconds;
       
@@ -789,7 +779,9 @@ function setupEventListeners() {
         // Load video at calculated position
 
         hasInitialSync = true;
+        await loadCurrentVideo();
         await processQueueState();
+        await loadQueue();
 
         player.loadVideoById({
           videoId: currentVideoData.videoId,
@@ -800,7 +792,9 @@ function setupEventListeners() {
       } else {
 
         hasInitialSync = true;
+        await loadCurrentVideo();
         await processQueueState();
+        await loadQueue();
 
         player.cueVideoById({
           videoId: currentVideoData.videoId,
@@ -812,9 +806,9 @@ function setupEventListeners() {
       
       // Update UI
       syncPlaybackButton.style.display = 'none';
-      controlButtons.style.display = 'flex';
+      syncDisplayWrapper.style.display = 'block';
       
-      console.log('=== SYNC PLAYBACK COMPLETED ===');
+      console.log('=== SYNC PLAYBACK COMPLETED');
 
     } catch (error) {
 
@@ -848,7 +842,7 @@ async function initializeApp() {
   
   // Show sync button and hide controls initially
   syncPlaybackButton.style.display = 'flex';
-  controlButtons.style.display = 'none';
+  // controlButtons.style.display = 'none';
   
   console.log('initializeApp completed');
 
