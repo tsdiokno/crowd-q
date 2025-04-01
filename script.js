@@ -784,61 +784,11 @@ function setupEventListeners() {
           startPos: startPosition,
           currentPos: currentPosition
         });
-
-        
-
-        // player.playVideo();
-
-        // player.seekTo({
-        //   seconds: currentPosition, 
-        //   allowSeekAhead: false
-        // });
-
-        
-
-        // player.pauseVideo();
-
-        // player.cueVideoById({
-        //   videoId: currentVideoData.videoId,
-        //   startSeconds: startPosition,
-        //   suggestedQuality: 'hd720'
-        // });
-
-        // player.playVideo();
-
-        // setTimeout ( function () {
-        //   player.playVideo();
-
-        //   setTimeout ( function () {
-        //     player.pauseVideo();
-
-        //     setTimeout ( function () {
-        //       player.cueVideoById({
-        //         videoId: currentVideoData.videoId,
-        //         startSeconds: startPosition,
-        //         suggestedQuality: 'hd720'
-        //       });
-
-        //       setTimeout ( function () {
-        //         player.playVideo();
-                
-        //       }, 1000);
-              
-        //     }, 1000);
-            
-        //   }, 1000);
-          
-        // }, 1000);
-        
-
-
-
        
 
         // Load video at calculated position
 
         hasInitialSync = true;
-
         await processQueueState();
 
         player.loadVideoById({
@@ -850,7 +800,6 @@ function setupEventListeners() {
       } else {
 
         hasInitialSync = true;
-
         await processQueueState();
 
         player.cueVideoById({
@@ -860,13 +809,6 @@ function setupEventListeners() {
         });
 
       }
-      
-      // Enable video control
-      // Delay it since processQueueState is pretty aggressive
-      
-      
-      
-      
       
       // Update UI
       syncPlaybackButton.style.display = 'none';
@@ -896,9 +838,9 @@ async function initializeApp() {
   await loadConfig();
   
   // Start ALL polling immediately
-  setInterval(loadQueue, 3000);
-  setInterval(loadCurrentVideo, 3000);
-  setInterval(processQueueState, 5000); 
+  setInterval(loadQueue, 5000);
+  setInterval(loadCurrentVideo, 5000);
+  setInterval(processQueueState, 3000); 
   
   // Set up event listeners
 
