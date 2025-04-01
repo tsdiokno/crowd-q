@@ -1,10 +1,15 @@
 {
-    "videoId": null,
-    "title": "Loading next video...",
+    "videoId": "caAV07xXtOA",
+    "title": "Incredible Computer Tip (NOT April Fools)",
+    "thumbnail": "https:\/\/i.ytimg.com\/vi\/caAV07xXtOA\/default.jpg",
+    "url": "https:\/\/www.youtube.com\/watch?v=caAV07xXtOA",
+    "addedBy": "Biden",
+    "timestamp": "2025-04-01T15:34:18.584Z",
     "status": {
         "user": "Biden",
         "position": 0,
-        "timestamp": "2025-04-01T15:34:29.497Z",
-        "details": "Loading next video..."
+        "timestamp": "2025-04-01T15:34:32.997Z",
+        "details": "Incredible Computer Tip (NOT April Fools)",
+        "action": "Play"
     }
 }
