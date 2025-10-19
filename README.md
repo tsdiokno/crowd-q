@@ -1,4 +1,4 @@
-# YTM4: A YouTube Collaborative Queue  
+# YTM4: A YouTube Collaborative Queue (Soon to be CloudQ) 
 
 ![image](/../main/screenshot.png?raw=true "Screenshot")
 
