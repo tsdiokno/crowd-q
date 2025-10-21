@@ -91,9 +91,16 @@ But if you want **a shared, same-room queue experience**, Crowd-Q is built exact
 * The YouTube IFrame Player API may restrict playback in development environments — use production hosting.
 * The app is intentionally basic; features like live sockets or advanced metadata can be added via forks.
 
-## 📜 License
+## 🧾 License
 
-Licensed under the GNU General Public License v3.0 (GPL-3.0).
+This project is licensed under the **Mozilla Public License 2.0 (MPL-2.0)**.  
+See the [LICENSE](LICENSE) file for full details.
+
+### Why the Change
+Crowd-Q was originally licensed under **GPL-3.0**, but it has been changed to **MPL-2.0** to encourage broader collaboration and flexibility.  
+MPL keeps the project open-source while allowing developers to integrate or extend specific components without being forced to open-source their entire application.  
+
+> In short: MPL-2.0 protects the openness of Crowd-Q’s core, while making it easier for others to build on it responsibly.
 
 ## 🤝 Contributing
 
