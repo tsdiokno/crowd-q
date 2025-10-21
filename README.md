@@ -1,123 +1,110 @@
-# Crowd-Q: A YouTube Collaborative Queue
+# Crowd-Q: Let the Crowd Run the Queue
 
 ![image](/../main/screenshot-crowdq.png?raw=true "Screenshot")
 
+**Crowd-Q** is a simple, lightweight web app for creating a **collaborative YouTube Music queue**.  
+Inspired by Spotify’s *Jam* feature — but built for YouTube — it lets everyone in the room add to one shared queue while **playback stays centralized** on the host device.
 
-A simple, lightweight web app for creating a collaborative YouTube music queue. Inspired by Spotify's **Jam** feature, this app allows multiple users to add YouTube links to a shared queue while playback remains centralized to the host. Ideal for group listening sessions where only YouTube is available.  
+> 🎵 One playback. One room. Everyone in control.
 
----
+## 🚀 Features
 
-## Features  
-- **Collaborative Queue**: Anyone with access to the app can add YouTube music links to the queue.  
-- **Centralized Playback**: Only the host (who knows the password) can control playback—play, pause, next song.  
-- **Real-Time Queue Updates**: The queue refreshes every 30 seconds automatically, or you can manually refresh it to see updates on-demand.  
-- **Password Protection**: Playback controls and are protected by a host-defined password to maintain centralized control.  
-- **Lightweight Design**: Simple UI, no unnecessary bloat.  
-- **Video Information**: Thumbnails are displayed automatically, and video titles are shown when a YouTube Data API key is configured.  
+- **Collaborative Queue** — Anyone connected can add YouTube links to the shared queue.  
+- **Centralized Playback** — Playback happens on a single host device; no synchronization required.  
+- **Real-Time Queue Updates** — The queue refreshes automatically every 30 seconds or on demand.  
+- **Password Protection** — Only the host can control playback.  
+- **Lightweight Design** — Minimal dependencies, fast and simple UI.  
+- **Video Info** — Automatically shows thumbnails and titles (when API key is set).
 
----
+## 🎧 What Makes Crowd-Q Different?
 
-## Why Use This?  
-This app is meant for **group music sessions** where YouTube is the primary platform. It provides a quick and rough alternative to Spotify's collaborative features when YouTube is your go-to music service.  
+Unlike other “watch-together” or “sync” apps, **Crowd-Q** is focused on **collaborative queueing**, not synchronized playback.  
+It’s designed for *same-room experiences* — a crowd-powered DJ setup, not a remote watch party.
 
-That said, if you're using this app alone or stumbled upon it accidentally, you might not find much use for it—you could simply make your own YouTube playlist or manually queue songs in the YouTube app.  
+### Comparison
 
----
+| App / Feature               | Core Purpose                                      | Playback Type                     | Collaboration Style               | Environment Focus       | Unique Differentiator                                 |
+|-----------------------------|---------------------------------------------------|-----------------------------------|-----------------------------------|-------------------------|-------------------------------------------------------|
+| **Crowd-Q**                 | Remote **collaborative queue** for YouTube Music  | Single central playback (no sync) | Shared queue management (same room) | Local / same-room setup | Acts as an *automatic, crowdsourced DJ* experience     |
+| **SyncTube / YouTube Sync** | Watch YouTube videos **in sync** across devices   | Fully synchronized playback       | Host-led shared viewing           | Remote / multi-device   | Focused on *synchronized watching*, not shared control |
+| **Spotify Jam**             | Group listening via Spotify app                   | Fully synchronized playback       | Invite-only group session         | Local or remote         | Similar to SyncTube but *natively integrated* in Spotify |
 
-## Installation  
+> 🟡 *Crowd-Q = Shared Control, One Playback (Same Room)*  
+> 🔵 *Others = Synchronized Playback (Across Devices)*
 
-### Prerequisites  
-- A web server with PHP support (e.g., Apache, Nginx).  
-- A browser that supports modern JavaScript.  
-- (Optional) YouTube Data API key for displaying video titles.  
+## 💡 Why Use This?
 
-### Steps  
-1. Clone this repository:  
+**Crowd-Q** is perfect for:
+- House parties or gatherings using YouTube Music as the main platform.  
+- Shared music sessions where multiple people want to contribute songs.  
+- Situations where only one speaker or playback device is available.
+
+If you’re looking for *synchronized playback across devices*, check out other great tools like **SyncTube** or **Spotify Jam**.  
+But if you want **a shared, same-room queue experience**, Crowd-Q is built exactly for that — and future development will stay focused on **queueing and collaborative control**, not syncing.
+
+## ⚙️ Installation
+
+### Prerequisites
+- A web server with PHP support (e.g. Apache, Nginx)  
+- A modern browser with JavaScript enabled  
+- *(Optional)* YouTube Data API key for displaying video titles
+
+### Steps
+1. Clone this repository:
    ```bash
    git clone https://github.com/tsdiokno/ytm4.git
-   ```  
+   ```
 
-2. Place the files in your web server's root directory.  
+2. Place the files in your web server’s root directory.
+3. Ensure `queue.json` is writable.
+4. *(Optional)* Create a `config.json` file with:
 
-3. Ensure the following files and folders are writable:  
-   - `queue.json` (for saving the queue state).  
-
-4. (Optional) Create a `config.json` file in the root directory with the following structure to enable video titles:  
    ```json
    {
      "youtube_api_key": "YOUR_API_KEY"
    }
-   ```  
-   Replace `YOUR_API_KEY` with your actual YouTube Data API key. You can get one from the [Google Cloud Console](https://console.cloud.google.com/). Without this, the app will still work but will only show video URLs and thumbnails.  
+   ```
+5. Start your server and open the app in your browser.
 
-5. Start your server and navigate to the app in your browser.  
+## 🎚️ Usage
 
----
+### Host
 
-## Usage  
+1. Open the app in your browser.
+2. Enter the **host password** (default: `12345`) to unlock playback controls.
+3. Connect your output device (speaker, sound system).
 
-### For Hosts  
-1. Open the app in your browser.  
-2. Enter the **host password** (default: `12345`) to unlock playback controls.  
-3. Connect the audio output to a speaker system for centralized playback.  
+### Guest
 
-### For Guests  
-1. Open the app in your browser (ensure you're on the same network as the host).  
-2. Add YouTube links to the queue.  
-3. Watch the queue update in real time and enjoy the music!  
+1. Join the same network as the host.
+2. Open the app in a browser.
+3. Add YouTube links to the queue and enjoy the music!
 
----
+## 🧠 Technical Overview
 
-## Technical Overview  
+* **Frontend:** HTML, CSS, vanilla JavaScript (YouTube IFrame Player API).
+* **Backend:** PHP scripts (`save_queue.php`, `get_queue.php`) managing `queue.json`.
+* **Queue Refresh:** Automatic every 30 seconds or manual refresh.
 
-### How It Works  
-1. **Frontend**:  
-   - Built with HTML, CSS, and vanilla JavaScript.  
-   - Uses the YouTube IFrame Player API for video playback.  
+## ⚠️ Known Limitations
 
-2. **Backend**:  
-   - Written in PHP to handle queue management (`save_queue.php`, `get_queue.php`).  
-   - The queue state is stored in a `queue.json` file.  
+* The YouTube IFrame Player API may restrict playback in development environments — use production hosting.
+* The app is intentionally basic; features like live sockets or advanced metadata can be added via forks.
 
-3. **Queue Updates**:  
-   - Automatically refreshed every 30 seconds via JavaScript.  
-   - Manual refresh available for on-demand updates.  
+## 📜 License
 
----
+Licensed under the GNU General Public License v3.0 (GPL-3.0).
 
-## Known Limitations  
-- **Development Mode Issues**: The YouTube IFrame Player API may block playback in non-production environments due to YouTube's restrictions. Make sure you run this app on a production server for it to work properly.  
-- **Basic Implementation**: The app is intentionally kept simple. Advanced features like server-side updates, more robust APIs, or complex metadata scraping are not implemented but can be added by forking the project.  
+## 🤝 Contributing
 
----
+1. Fork the repo.
+2. Create a feature branch (`git checkout -b feature-name`).
+3. Commit and push (`git commit -m 'Add feature'`).
+4. Submit a pull request.
 
-## License  
+## 🙏 Acknowledgments
 
-This project is licensed under the GNU General Public License v3.0 (GPL-3.0).
+Built by **@tsdiokno**, with design-first simplicity and the help of **ChatGPT**.
+**Crowd-Q** stays focused on what it does best: a **shared queue experience** — not a sync app, but a social DJ tool.
 
----
-
-## Contribution  
-
-We welcome contributions! Here's how you can help:  
-1. Fork the repository.  
-2. Create a feature branch (`git checkout -b feature-name`).  
-3. Commit your changes (`git commit -m 'Add feature'`).  
-4. Push to your branch (`git push origin feature-name`).  
-5. Open a pull request.  
-
----
-
-## Acknowledgments  
-
-This app was created by **@tsdiokno**, a designer with limited coding experience, with the help of **ChatGPT**. The project intentionally sticks to the basics but serves as a functional example of a collaborative YouTube queue.  
-
-Feel free to fork and enhance the app with features like more advanced API usage, server-side updates, and metadata scraping.  
-
----
-
-## Disclaimer  
-
-If you use this app alone, it's no different from manually queuing songs in YouTube or creating a playlist. This app works best in group settings where the host controls playback, and everyone else contributes to the queue.  
-
-Enjoy the music! 🎶
+> “Let the crowd run the queue.” 🎶
